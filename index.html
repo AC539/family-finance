@@ -290,6 +290,20 @@
       </div>
       <div class="hint">首次使用请先点「🚀 初始化/重置起点」：盘点各卡余额、现金、已存存款归属、资金池现状，作为记账起点。<span id="initStatus"></span></div>
     </div>
+    <div class="card">
+      <h3>☁️ GitHub 自动备份 <span class="tag">防丢失冗余</span></h3>
+      <div class="form-row">
+        <div class="field" style="flex:1;"><label>GitHub Token（建议只勾 gist 权限；只存本浏览器，不写入代码）</label>
+          <input type="password" id="ghToken" placeholder="ghp_..." style="width:100%;" autocomplete="off"></div>
+        <button class="btn" onclick="saveToken()">🔗 保存并连接</button>
+      </div>
+      <div id="backupStatus" style="margin:6px 0;"></div>
+      <div class="form-row" style="margin:0;">
+        <label class="check-row" style="margin-right:14px;"><input type="checkbox" id="backupAuto" onchange="toggleAuto()"> 每月确认后自动备份</label>
+        <button class="btn gray sm" onclick="syncToGist(true)">☁️ 立即备份一次</button>
+      </div>
+      <div class="hint">数据会上传到你的 GitHub 私有 Gist（secret，仅你可见），内容为全部记账数据 JSON。建议在 GitHub 设置 → Developer settings → Personal access tokens 生成专用 Token（仅勾 gist）。</div>
+    </div>
   </div>
 
   <div class="modal-mask" id="modalMask">
@@ -336,12 +350,13 @@ function load(){
     const s=JSON.parse(localStorage.getItem(LS_KEY));
     if(s&&s.months)return migrate(s);
   }catch(e){}
-  return {months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null};
+  return {months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null,backupCfg:{enabled:false,gistId:null,lastSync:null}};
 }
 /* 旧版本数据迁移：补齐新增字段，保证老数据无缝衔接 */
 function migrate(s){
   if(!s.assetCats)s.assetCats=[...DEFAULT_ASSET_CATS];
   if(!s.assets)s.assets=[];
+  if(!s.backupCfg)s.backupCfg={enabled:false,gistId:null,lastSync:null};
   // 旧资金池补齐 type（默认预算）
   (s.pools||[]).forEach(p=>{if(!p.type)p.type='budget';});
   for(const m in s.months){
@@ -567,6 +582,8 @@ function confirmMonth(){
   curEditM=null;
   save();renderAll();
   toast(`✅ ${curM} 已确认，数据已同步到各模块`);
+  // 自动备份（若已启用）
+  if(state.backupCfg&&state.backupCfg.enabled&&ghToken())syncToGist(false);
 }
 /* 进入编辑模式：解锁当月输入，改完需再次确认才更新模块 */
 function editMonth(){
@@ -1016,6 +1033,83 @@ function renderSettings(){
       ? `当前起点：${state.init.month}（${prevMonth(state.init.month)}收入 ${fmt(state.init.prevIncome)} 支撑）· 起始总资产 ${fmt(initAssetTotal())} · 存量存款 👨${fmt(state.init.depositH)}/👩${fmt(state.init.depositW)}`
       : '尚未初始化';
   }
+  // GitHub 备份状态
+  renderBackupStatus();
+}
+/* ============================================================
+   GitHub 自动备份（私有 Gist）
+============================================================ */
+function ghToken(){try{return localStorage.getItem('familyFin_token')||'';}catch(e){return '';}}
+function renderBackupStatus(){
+  const box=document.getElementById('backupStatus');
+  if(!box)return;
+  const hasToken=!!ghToken();
+  const cfg=state.backupCfg||{};
+  const auto=document.getElementById('backupAuto');
+  if(auto)auto.checked=!!cfg.enabled;
+  let html='';
+  if(!hasToken){
+    html=`<div class="hint" style="color:var(--orange);">未连接：粘贴 GitHub Token 后点「保存并连接」。生成方法：GitHub → Settings → Developer settings → Personal access tokens → 勾选 gist 权限。</div>`;
+  }else{
+    html=`<div style="font-size:13px;">✅ 已连接（Token 存在本浏览器）${cfg.gistId?` ｜ 备份位置：<a href="https://gist.github.com/${esc(cfg.gistId)}" target="_blank" style="color:var(--blue);">私有 Gist ↗</a>`:''}${cfg.lastSync?` ｜ 上次备份：${esc(cfg.lastSync)}`:''}</div>`;
+  }
+  box.innerHTML=html;
+}
+function saveToken(){
+  const t=document.getElementById('ghToken').value.trim();
+  if(!t){toast('请输入 Token');return;}
+  fetch('https://api.github.com/user',{headers:{'Authorization':'token '+t}})
+    .then(r=>r.json())
+    .then(u=>{
+      if(u&&u.login){
+        localStorage.setItem('familyFin_token',t);
+        state.backupCfg=state.backupCfg||{};state.backupCfg.enabled=true;
+        save();document.getElementById('ghToken').value='';
+        renderBackupStatus();renderAll();
+        toast('✅ 已连接 '+u.login);
+        syncToGist(true);
+      }else{
+        toast('Token 无效：'+(u.message||'请检查权限'));
+      }
+    })
+    .catch(()=>toast('网络错误，无法连接 GitHub'));
+}
+function toggleAuto(){
+  state.backupCfg=state.backupCfg||{};
+  state.backupCfg.enabled=document.getElementById('backupAuto').checked;
+  save();
+  toast(state.backupCfg.enabled?'已开启自动备份':'已关闭自动备份');
+}
+/* 备份全部数据到私有 Gist（自动/手动） */
+async function syncToGist(manual){
+  const t=ghToken();
+  if(!t){toast('未配置 GitHub Token，请到设置页连接');return;}
+  if(!state.backupCfg)state.backupCfg={};
+  // 备份数据不包含 token（token 在 localStorage 单独存储）
+  const data=JSON.stringify({...state,backupCfg:{enabled:state.backupCfg.enabled,gistId:state.backupCfg.gistId,lastSync:state.backupCfg.lastSync}});
+  try{
+    let gid=state.backupCfg.gistId;
+    if(!gid){
+      const res=await fetch('https://api.github.com/gists',{
+        method:'POST',
+        headers:{'Authorization':'token '+t,'Content-Type':'application/json'},
+        body:JSON.stringify({public:false,description:'家庭财务管家自动备份',files:{'family-finance-backup.json':{content:data}}})
+      });
+      const j=await res.json();
+      if(j.id){state.backupCfg.gistId=j.id;}
+      else{toast('创建备份失败：'+(j.message||'可能 Token 无 gist 权限'));return;}
+    }else{
+      const res=await fetch('https://api.github.com/gists/'+gid,{
+        method:'PATCH',
+        headers:{'Authorization':'token '+t,'Content-Type':'application/json'},
+        body:JSON.stringify({files:{'family-finance-backup.json':{content:data}}})
+      });
+      if(!res.ok){const j=await res.json();toast('备份失败：'+(j.message||''));return;}
+    }
+    state.backupCfg.lastSync=new Date().toLocaleString('zh-CN');
+    save();renderBackupStatus();
+    toast(manual?'☁️ 备份完成，已上传到私有 Gist':'☁️ 已自动备份到 GitHub');
+  }catch(e){toast('备份出错：'+e.message);}
 }
 function goSettings(anchor){
   switchTab('settings');
@@ -1118,7 +1212,7 @@ function importData(ev){
       const d=JSON.parse(e.target.result);
       if(!d.months)throw new Error('bad');
       confirmModal('导入数据',`将导入 ${Object.keys(d.months).length} 个月的数据，覆盖当前数据。确定？`,()=>{
-        state={...d,expTypes:d.expTypes||[...DEFAULT_TYPES],pools:d.pools||[...DEFAULT_POOLS],assetCats:d.assetCats||[...DEFAULT_ASSET_CATS],assets:d.assets||[],cfg:d.cfg||{threshold:16000,base:5000},init:d.init||null};
+        state={...d,expTypes:d.expTypes||[...DEFAULT_TYPES],pools:d.pools||[...DEFAULT_POOLS],assetCats:d.assetCats||[...DEFAULT_ASSET_CATS],assets:d.assets||[],cfg:d.cfg||{threshold:16000,base:5000},init:d.init||null,backupCfg:d.backupCfg||{enabled:false,gistId:null,lastSync:null}};
         save();renderAll();toast('✅ 导入成功');
       });
     }catch(err){toast('文件解析失败');}
@@ -1127,7 +1221,7 @@ function importData(ev){
 }
 function clearAll(){
   confirmModal('清空全部数据','将删除所有月份数据，此操作不可恢复！请先导出备份。确定？',()=>{
-    state={months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null};
+    state={months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null,backupCfg:{enabled:false,gistId:null,lastSync:null}};
     save();renderAll();toast('已清空');
   });
 }
