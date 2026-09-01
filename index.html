@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭财务管家</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --line:#e6ebf1; --txt:#2c3e50; --sub:#7f8c9b;
+    --blue:#4a90d9; --blue-l:#eaf2fc; --blue-m:#7fb3e8;
+    --green:#27ae60; --purple:#8e6fc4; --orange:#e8a33d; --pink:#e87da0; --red:#e74c3c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;}
+  .wrap{max-width:1060px;margin:0 auto;padding:16px 16px 70px;}
+  header{background:linear-gradient(135deg,#4a90d9,#6aa7e8);color:#fff;border-radius:14px;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 4px 14px rgba(74,144,217,.25);}
+  header h1{font-size:21px;font-weight:600;letter-spacing:1px;}
+  header .sub{font-size:12px;opacity:.9;margin-top:2px;}
+  .hd-right{display:flex;gap:22px;text-align:center;}
+  .hd-right .it .lbl{font-size:11px;opacity:.85;}
+  .hd-right .it .val{font-size:20px;font-weight:700;}
+  nav{display:flex;gap:6px;margin:16px 0 4px;flex-wrap:wrap;}
+  nav button{border:1px solid var(--line);background:#fff;color:var(--sub);padding:8px 16px;border-radius:20px;cursor:pointer;font-size:14px;transition:.2s;}
+  nav button:hover{border-color:var(--blue-m);color:var(--blue);}
+  nav button.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
+  .panel{display:none;margin-top:14px;}
+  .panel.active{display:block;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+  .card h3{font-size:16px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .card h3 .tag{font-size:11px;background:var(--blue-l);color:var(--blue);padding:2px 8px;border-radius:10px;font-weight:400;}
+  .hint{font-size:12px;color:var(--sub);}
+  .pos{color:var(--green);}.neg{color:var(--red);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr;}}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{background:#f8fafc;color:var(--sub);font-weight:600;text-align:left;padding:8px 10px;border-bottom:2px solid var(--line);font-size:13px;}
+  td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  input[type=number],input[type=text],select{border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:14px;background:#fff;color:var(--txt);outline:none;font-family:inherit;width:100%;}
+  input:focus,select:focus{border-color:var(--blue-m);box-shadow:0 0 0 2px var(--blue-l);}
+  .inp-sm{width:110px!important;}
+  .btn{border:none;background:var(--blue);color:#fff;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:14px;transition:.2s;}
+  .btn:hover{background:#3a7bc0;}
+  .btn.gray{background:#eef1f4;color:var(--txt);}.btn.gray:hover{background:#e0e5eb;}
+  .btn.green{background:var(--green);}.btn.green:hover{background:#219653;}
+  .btn.danger{background:#fff;color:var(--red);border:1px solid #f0c9c9;}.btn.danger:hover{background:#fdf1f1;}
+  .btn.orange{background:var(--orange);}.btn.orange:hover{background:#d18a1f;}
+  .btn.sm{padding:3px 9px;font-size:12px;border-radius:6px;}
+  .badge{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px;background:#f0f3f7;color:var(--sub);}
+  .badge.h{background:var(--blue-l);color:var(--blue);}
+  .badge.w{background:#fdeef3;color:#d05a85;}
+  .badge.fam{background:#f2edfb;color:var(--purple);}
+  .badge.green{background:#e9f7ef;color:var(--green);}
+  .badge.orange{background:#fdf3e3;color:#d18a1f;}
+  .empty{padding:24px;text-align:center;color:var(--sub);font-size:14px;}
+  .form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field label{font-size:12px;color:var(--sub);}
+  #toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(80px);background:#2c3e50;color:#fff;padding:10px 22px;border-radius:24px;font-size:14px;opacity:0;transition:.3s;z-index:99;pointer-events:none;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .modal-mask{position:fixed;inset:0;background:rgba(30,40,60,.45);display:none;align-items:center;justify-content:center;z-index:50;}
+  .modal-mask.show{display:flex;}
+  .modal{background:#fff;border-radius:14px;padding:22px 24px;max-width:440px;width:92%;box-shadow:0 10px 40px rgba(0,0,0,.2);max-height:82vh;overflow:auto;}
+  .modal h4{font-size:16px;margin-bottom:10px;}
+  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+  .res{font-size:14px;line-height:1.9;}
+  .res b{color:var(--blue);}
+  .res .big{font-size:26px;font-weight:700;color:var(--blue);}
+  .progress{height:10px;background:#eef1f4;border-radius:6px;overflow:hidden;margin-top:4px;}
+  .progress i{display:block;height:100%;background:var(--purple);border-radius:6px;}
+  .bank-row{display:flex;gap:8px;align-items:center;padding:6px 0;flex-wrap:wrap;}
+  .ttl-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  hr.sep{border:none;border-top:1px dashed var(--line);margin:12px 0;}
+  .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);font-size:14px;}
+  .kv:last-child{border-bottom:none;}
+  .flow-line{font-size:13px;color:var(--sub);margin-top:6px;}
+  .save-split{background:var(--blue-l);border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🏠 家庭财务管家</h1>
+      <div class="sub">每月一张表 · 存款归属清楚 · 盈余自由支配</div>
+    </div>
+    <div class="hd-right">
+      <div class="it"><div class="lbl">🏠 家庭总资产</div><div class="val" id="hdTotal" style="color:#fff;">¥0</div></div>
+      <div class="it"><div class="lbl">👨 老公存款</div><div class="val" id="hdH">¥0</div></div>
+      <div class="it"><div class="lbl">👩 老婆存款</div><div class="val" id="hdW">¥0</div></div>
+    </div>
+  </header>
+
+  <nav id="nav">
+    <button data-p="month" class="active">📅 月度表</button>
+    <button data-p="husband">👨 老公</button>
+    <button data-p="wife">👩 老婆</button>
+    <button data-p="family">🏠 家庭</button>
+    <button data-p="trend">📈 趋势</button>
+    <button data-p="settings">⚙️ 设置</button>
+  </nav>
+
+  <!-- ================= 月度表 ================= -->
+  <div class="panel active" id="p-month">
+    <div class="card" id="initBanner" style="display:none;border:2px solid var(--orange);background:#fffaf0;">
+      <h3 style="color:#d18a1f;">🚀 开始使用前，请先初始化家庭资产</h3>
+      <div style="font-size:14px;">从今天（<b id="initMonthTag"></b>）开始记账前，先盘点一下家庭现有的家底（各银行卡余额、现金、已存的钱怎么分、资金池已攒多少），软件的所有累计都会以此为基础。</div>
+      <button class="btn orange" style="margin-top:10px;" onclick="openWizard()">🚀 立即初始化</button>
+    </div>
+
+    <div class="card">
+      <div class="ttl-bar">
+        <h3 style="margin:0;">📅 本月收支表</h3>
+        <div class="form-row" style="margin:0;">
+          <select id="mMonth" style="width:130px;" onchange="switchMonth()"></select>
+          <button class="btn gray" onclick="switchMonthOffset(1)">◀</button>
+          <button class="btn gray" onclick="switchMonthOffset(-1)">▶</button>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:6px;">所有数字改完自动保存，无需点保存按钮。</div>
+    </div>
+
+    <!-- 收入 -->
+    <div class="card">
+      <h3>💰 本月收入</h3>
+      <div class="form-row">
+        <div class="field"><label>👨 老公收入</label><input type="number" id="incH" class="inp-sm" min="0" oninput="onIncomeInput()"></div>
+        <div class="field"><label>👩 老婆收入</label><input type="number" id="incW" class="inp-sm" min="0" oninput="onIncomeInput()"></div>
+        <div class="field"><label>💵 现金收入</label><input type="number" id="incC" class="inp-sm" min="0" oninput="onIncomeInput()"></div>
+        <div class="field"><label style="visibility:hidden;">x</label><span class="res" id="incTotal"></span></div>
+      </div>
+    </div>
+
+    <!-- 本月支出 -->
+    <div class="card">
+      <h3>💸 本月支出 <span class="tag">用于计算盈余与存款归属</span></h3>
+      <div class="form-row">
+        <div class="field"><label>👨 老公支出</label><input type="number" id="expH" class="inp-sm" min="0" oninput="onExpTotalInput()"></div>
+        <div class="field"><label>👩 老婆支出</label><input type="number" id="expW" class="inp-sm" min="0" oninput="onExpTotalInput()"></div>
+        <div class="field"><label>💵 现金支出</label><input type="number" id="expC" class="inp-sm" min="0" oninput="onExpTotalInput()"></div>
+        <div class="field"><label style="visibility:hidden;">x</label><span class="res" id="expTotalLbl"></span></div>
+      </div>
+      <div class="hint">本月实际花掉的总额（按银行卡 + 现金统计）。下方的「消费统计」仅用于分析各类型占比，不参与计算。</div>
+    </div>
+
+    <!-- 消费统计 -->
+    <div class="card">
+      <div class="ttl-bar">
+        <h3 style="margin:0;">📊 本月消费统计 <span class="tag">仅分析占比</span></h3>
+        <button class="btn gray sm" onclick="goSettings('exp')">＋ 管理消费类型</button>
+      </div>
+      <table>
+        <tr><th style="width:38%;">消费项目</th><th class="num">👨 老公</th><th class="num">👩 老婆</th><th class="num">小计</th></tr>
+        <tbody id="expRows"></tbody>
+        <tr style="background:#f8fafc;"><td><b>合计</b></td><td class="num" id="expHTotal" style="font-weight:700;">¥0</td><td class="num" id="expWTotal" style="font-weight:700;">¥0</td><td class="num" id="expGrand" style="font-weight:700;">¥0</td></tr>
+      </table>
+      <div class="hint" style="margin-top:6px;">这里只记录"钱花在哪类"（分析占比用），实际支出请填上面的「本月支出」。</div>
+    </div>
+
+    <!-- 存款 -->
+    <div class="card">
+      <h3>🏦 本月存款</h3>
+      <div class="form-row">
+        <div class="field"><label>存款金额（自动建议，可改）</label><input type="number" id="saveAmt" class="inp-sm" min="0"></div>
+        <div class="field"><label style="visibility:hidden;">x</label><span class="hint" id="saveSuggest"></span></div>
+      </div>
+      <div id="saveSplitBox" class="save-split"></div>
+      <div class="hint" style="margin-top:6px;">存款不单独确认，填好后在页面最下方点「✅ 确认本月数据」一次性生效。</div>
+    </div>
+
+    <!-- 盈余 -->
+    <div class="card" style="border-top:3px solid var(--orange);">
+      <h3>💎 本月盈余（可自由支配）</h3>
+      <div class="res" id="surplusBox"></div>
+      <hr class="sep">
+      <p style="font-size:13px;font-weight:600;color:var(--purple);margin-bottom:4px;">🎯 资金池分配 <span class="tag">📦预算=从盈余划拨(钱还在) · 🪙预支=已花掉(从总资产扣)</span></p>
+      <div id="poolAllocRows"></div>
+      <div class="form-row" style="margin-top:8px;">
+        <button class="btn gray sm" onclick="goSettings('pool')">＋ 新建资金池</button>
+      </div>
+      <div class="hint" id="poolAllocSum" style="margin-top:6px;"></div>
+    </div>
+
+    <!-- 总确认 -->
+    <div class="card" style="border:2px solid var(--green);background:#f4fbf6;">
+      <div id="monthConfirmBox" style="text-align:center;padding:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ================= 老公 ================= -->
+  <div class="panel" id="p-husband">
+    <div class="stats grid2" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));display:grid;gap:12px;margin-bottom:14px;">
+      <div class="card" style="margin:0;border-top:3px solid var(--blue);"><div class="hint">🏦 名下存款累计</div><div class="res"><span class="big" id="hDeposit">¥0</span></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--green);"><div class="hint">💰 本月收入</div><div class="res" id="hIncome"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--orange);"><div class="hint">💸 本月开销</div><div class="res" id="hExp"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--purple);"><div class="hint">💰 老公自由资金</div><div class="res" id="hSurplus"></div></div>
+    </div>
+    <div class="card"><h3>👨 老公的资金池</h3><div id="hPools"></div></div>
+    <div class="card"><h3>📋 老公各月开销明细</h3><div id="hDetail"></div></div>
+  </div>
+
+  <!-- ================= 老婆 ================= -->
+  <div class="panel" id="p-wife">
+    <div class="stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
+      <div class="card" style="margin:0;border-top:3px solid var(--pink);"><div class="hint">🏦 名下存款累计</div><div class="res"><span class="big" id="wDeposit" style="color:var(--pink);">¥0</span></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--green);"><div class="hint">💰 本月收入</div><div class="res" id="wIncome"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--orange);"><div class="hint">💸 本月开销</div><div class="res" id="wExp"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--purple);"><div class="hint">💰 老婆自由资金</div><div class="res" id="wSurplus"></div></div>
+    </div>
+    <div class="card"><h3>👩 老婆的资金池</h3><div id="wPools"></div></div>
+    <div class="card"><h3>📋 老婆各月开销明细</h3><div id="wDetail"></div></div>
+  </div>
+
+  <!-- ================= 家庭 ================= -->
+  <div class="panel" id="p-family">
+    <div class="stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
+      <div class="card" style="margin:0;border-top:3px solid var(--purple);"><div class="hint">💰 家庭总收入</div><div class="res" id="fIncome"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--orange);"><div class="hint">💸 家庭总开销</div><div class="res" id="fExp"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--green);"><div class="hint">🏦 家庭存款累计</div><div class="res" id="fDeposit"></div></div>
+      <div class="card" style="margin:0;border-top:3px solid var(--blue);"><div class="hint">📅 累计盈余</div><div class="res" id="fSurplus"></div></div>
+    </div>
+    <div class="card" id="initSummary" style="display:none;">
+      <h3>🏁 期初资产盘点 <span class="tag">初始化起点</span></h3>
+      <div id="initSummaryBody"></div>
+    </div>
+    <div class="card" id="nowSummaryCard" style="display:none;border-top:3px solid var(--blue);">
+      <h3>📍 现在资产盘点 <span class="tag">实时</span></h3>
+      <div id="nowSummaryBody"></div>
+    </div>
+    <div class="card"><h3>🎯 家庭资金池（含目标进度）</h3><div id="fPools"></div></div>
+    <div class="card">
+      <h3>💼 资产配置清单 <span class="tag">类别与项目可自定义</span></h3>
+      <div class="form-row">
+        <div class="field"><label>类别</label><select id="assetCat"></select></div>
+        <div class="field"><label>项目名称</label><input type="text" id="assetName" class="w140" placeholder="如：黄金 / 指数基金"></div>
+        <div class="field"><label>金额(¥)</label><input type="number" id="assetAmt" class="w140" min="0"></div>
+        <button class="btn" onclick="addAsset()">＋ 添加项目</button>
+        <button class="btn gray" onclick="openAssetCats()">管理类别</button>
+      </div>
+      <div id="assetList"></div>
+      <div class="hint" style="margin-top:6px;">这里记录家庭的钱配置在哪些投资上（理财/股票/定期存单等），仅作清单查看，不影响存款与盈余计算。</div>
+    </div>
+    <div class="card"><h3>📊 家庭开销构成（全年累计 · 按消费统计）</h3><div id="fExpCat"></div></div>
+  </div>
+
+  <!-- ================= 趋势 ================= -->
+  <div class="panel" id="p-trend">
+    <div class="card"><h3>📈 月度趋势 <span class="tag">柱：收入/消费 · 线：存款/盈余</span></h3><div id="trendChart"></div></div>
+    <div class="card"><h3>💰 资金池余额走势</h3><div id="poolTrend"></div></div>
+  </div>
+
+  <!-- ================= 设置 ================= -->
+  <div class="panel" id="p-settings">
+    <div class="card">
+      <h3>🏷️ 消费类型管理</h3>
+      <div class="form-row">
+        <div class="field" style="flex:1;"><label>新类型名称</label><input type="text" id="newExpType" placeholder="如：宠物 / 医疗 / 小孩教育"></div>
+        <button class="btn" onclick="addExpType()">＋ 添加类型</button>
+      </div>
+      <div id="expTypeList"></div>
+    </div>
+    <div class="card">
+      <h3>🎯 资金池管理</h3>
+      <div class="form-row">
+        <div class="field"><label>池子名称</label><input type="text" id="newPoolName" class="w180" placeholder="如：买房基金"></div>
+        <div class="field"><label>归属</label><select id="newPoolOwner"><option value="家庭">🏠 家庭</option><option value="老公">👨 老公</option><option value="老婆">👩 老婆</option></select></div>
+        <div class="field"><label>类型</label><select id="newPoolType"><option value="budget">📦 预算（钱还在，先留用）</option><option value="advance">🪙 预支（已花掉，从总资产扣）</option></select></div>
+        <div class="field"><label>目标金额(¥)</label><input type="number" id="newPoolTarget" class="w180" min="0" placeholder="0=不限"></div>
+        <button class="btn" onclick="addPool()">＋ 添加池子</button>
+      </div>
+      <div id="poolList"></div>
+    </div>
+    <div class="card">
+      <h3>⚙️ 存款规则</h3>
+      <div class="form-row">
+        <div class="field"><label>收入达标线(¥)</label><input type="number" id="cfgThr" class="inp-sm" min="0" onchange="saveCfg()"></div>
+        <div class="field"><label>达标后存款(¥)</label><input type="number" id="cfgBase" class="inp-sm" min="0" onchange="saveCfg()"></div>
+        <span class="hint">收入 ≥ 达标线 → 存「达标后存款」；不足 → 按收入比例缩减</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>💾 数据备份</h3>
+      <div class="form-row">
+        <button class="btn orange" onclick="openWizard()">🚀 初始化 / 重置起点</button>
+        <button class="btn green" onclick="resetMonths()">🧹 清空月度数据（保留初始化）</button>
+        <button class="btn" onclick="exportData()">⬇️ 导出备份</button>
+        <label class="btn gray" style="cursor:pointer;">⬆️ 导入<input type="file" accept=".json" style="display:none;" onchange="importData(event)"></label>
+        <button class="btn orange" onclick="loadSample()">载入示例</button>
+        <button class="btn danger" onclick="clearAll()">清空</button>
+      </div>
+      <div class="hint">首次使用请先点「🚀 初始化/重置起点」：盘点各卡余额、现金、已存存款归属、资金池现状，作为记账起点。<span id="initStatus"></span></div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="modalMask">
+    <div class="modal">
+      <h4 id="modalTitle">确认</h4>
+      <div id="modalBody" style="font-size:14px;color:#444;"></div>
+      <div class="actions">
+        <button class="btn gray" onclick="closeModal()">取消</button>
+        <button class="btn danger" id="modalOk" onclick="modalOkFn()">确认</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script>
+/* ============================================================
+   家庭财务管家 v3.5
+   模式：每月一张表 + 本月支出 + 消费统计 + 存款归属 + 盈余分配资金池 + 资产配置清单
+   核心规则：
+   - 存款额：收入≥threshold → base；不足 → base×收入/threshold（可手动改）
+   - 存款归属：按双方开销反比（开销占比高者存款少）——开销取"本月支出"老公/老婆部分
+   - 盈余 = 上月收入 − 本月支出 − 本月存款（上月收入撑本月开销）
+   - 消费统计表仅用于分析各类型占比，不参与计算
+   - 盈余手动分配进资金池（可自定义，可设目标）
+   - 资金池类型：预算(budget)=分配自由资金用，钱还在；预支(advance)=已花掉的钱，从总资产扣除
+   - 总资产 = 期初总资产 + 已确认月份盈余 − 预支池已花金额（未确认月份不计入）
+============================================================ */
+const LS_KEY='familyFin_v1';
+const DEFAULT_TYPES=['吃饭','房租/房贷','燃气水电物业','通勤','日用品','家庭硬件','衣服/化妆品','旅游/兴趣爱好','父母支出','人情往来','其他支出'];
+const DEFAULT_POOLS=[
+  {id:'p1',name:'年度旅游基金',owner:'家庭',target:12000,type:'advance'},
+  {id:'p2',name:'梦想基金',owner:'家庭',target:20000,type:'budget'},
+  {id:'p3',name:'老公自由资金',owner:'老公',target:0,type:'budget'},
+  {id:'p4',name:'老婆自由资金',owner:'老婆',target:0,type:'budget'}
+];
+const DEFAULT_ASSET_CATS=['理财产品类','股票类','定期存单'];
+let state=load();
+let curM='';
+let curEditM=null; // 当前处于"编辑模式"的月份（输入框解锁）
+
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(LS_KEY));
+    if(s&&s.months)return migrate(s);
+  }catch(e){}
+  return {months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null};
+}
+/* 旧版本数据迁移：补齐新增字段，保证老数据无缝衔接 */
+function migrate(s){
+  if(!s.assetCats)s.assetCats=[...DEFAULT_ASSET_CATS];
+  if(!s.assets)s.assets=[];
+  // 旧资金池补齐 type（默认预算）
+  (s.pools||[]).forEach(p=>{if(!p.type)p.type='budget';});
+  for(const m in s.months){
+    const d=s.months[m];
+    if(!d)continue;
+    // 旧月份没有 expTotal（本月支出）时，从消费统计表推导
+    if(!d.expTotal){
+      let h=0,w=0;
+      for(const k in (d.exp||{})){h+=(Number(d.exp[k].h)||0);w+=(Number(d.exp[k].w)||0);}
+      d.expTotal={h,w,c:0};
+    }
+    // 旧月份无 done：有 save（已确认过存款）视为已确认
+    if(d.done===undefined)d.done = d.save!=null;
+    // 移除旧字段
+    delete d.bank;
+  }
+  return s;
+}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function fmt(n){n=Number(n)||0;const neg=n<0;return (neg?'-':'')+'¥'+Math.abs(n).toLocaleString('zh-CN',{maximumFractionDigits:0});}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
+function today(){return new Date().toISOString().slice(0,10);}
+function curMonthStr(){return today().slice(0,7);}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ---------- 月度数据访问 ---------- */
+function getM(m){m=m||curM;if(!state.months[m])state.months[m]={income:{h:0,w:0,c:0},exp:{},expTotal:{h:0,w:0,c:0},save:null,poolAlloc:{},done:false};return state.months[m];}
+function mIncome(m){const d=getM(m).income;return (Number(d.h)||0)+(Number(d.w)||0)+(Number(d.c)||0);}
+/* 本月支出（实际支出，用于计算） */
+function mExpH(m){return Number(getM(m).expTotal.h)||0;}
+function mExpW(m){return Number(getM(m).expTotal.w)||0;}
+function mExpC(m){return Number(getM(m).expTotal.c)||0;}
+function mExpTotal(m){return mExpH(m)+mExpW(m)+mExpC(m);}
+/* 消费统计（分类明细，仅用于占比分析） */
+function expStat(m){
+  const d=getM(m);let h=0,w=0;
+  for(const k in d.exp){h+=(Number(d.exp[k].h)||0);w+=(Number(d.exp[k].w)||0);}
+  return {h,w};
+}
+function mSave(m){const d=getM(m);return d.save!=null?Number(d.save):0;}
+function saveSuggest(income){const c=state.cfg;if(!c.base)return 0;if(income>=c.threshold)return c.base;return Math.round(c.base*income/c.threshold);}
+/* 存款归属：反比开销 */
+function saveSplit(m){
+  const h=mExpH(m),w=mExpW(m),tot=mSave(m);
+  if(tot<=0)return {h:0,w:0};
+  if(h+w===0)return {h:Math.round(tot/2),w:Math.round(tot/2)};
+  return {h:Math.round(tot*w/(h+w)),w:Math.round(tot*h/(h+w))};
+}
+/* 盈余 = 上月收入 - 本月消费 - 本月存款 */
+function prevMonth(m){const d=new Date(m+'-01');d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function lastIncome(m){
+  m=m||curM;
+  const p=prevMonth(m);
+  if(state.months[p]&&mIncome(p)>0)return mIncome(p);
+  // 起始月：用初始化时填的「上月收入」（如8月账单由7月收入支撑）
+  if(state.init&&state.init.done&&m===state.init.month&&state.init.prevIncome!=null)return Number(state.init.prevIncome)||0;
+  // 找不到上月收入：用本月（首月提示）
+  return mIncome(m);
+}
+function mSurplus(m){
+  const last=lastIncome(m);
+  return Math.round(last - mExpTotal(m) - mSave(m));
+}
+/* 存款累计（含期初存量） */
+function cumSave(){
+  let h=state.init?Number(state.init.depositH)||0:0;
+  let w=state.init?Number(state.init.depositW)||0:0;
+  for(const m in state.months){const s=saveSplit(m);h+=s.h;w+=s.w;}
+  return {h,w};
+}
+/* 池子余额（含期初存量） */
+function poolBal(id){
+  let s=(state.init&&state.init.poolInit&&Number(state.init.poolInit[id]))||0;
+  for(const m in state.months){s+=(Number(state.months[m].poolAlloc?state.months[m].poolAlloc[id]:0)||0);}
+  return s;
+}
+/* 期初总资产 = 各卡余额 + 现金 + 定期/理财 */
+function initAssetTotal(){
+  if(!state.init)return 0;
+  let t=Number(state.init.cash)||0;
+  (state.init.cards||[]).forEach(c=>{t+=Number(c.bal)||0;});
+  t+=Number(state.init.fixed)||0;
+  return t;
+}
+/* 已确认月份（done=true）的盈余累计 */
+function confirmedSurplus(){
+  let t=0;
+  for(const m in state.months){
+    const d=state.months[m];
+    if(d&&d.done)t+=mSurplus(m);
+  }
+  return t;
+}
+/* 预支池已花金额 = 分配到"预支"类型池子的钱（视为已花掉），含初始化存量与各月分配 */
+function advanceSpentTotal(){
+  let t=0;
+  if(state.init&&state.init.poolInit){
+    for(const pid in state.init.poolInit){
+      const p=state.pools.find(x=>x.id===pid);
+      if(p&&p.type==='advance')t+=(Number(state.init.poolInit[pid])||0);
+    }
+  }
+  for(const m in state.months){
+    const d=state.months[m];
+    if(!d||!d.poolAlloc)continue;
+    for(const pid in d.poolAlloc){
+      const p=state.pools.find(x=>x.id===pid);
+      if(p&&p.type==='advance')t+=(Number(d.poolAlloc[pid])||0);
+    }
+  }
+  return t;
+}
+/* 当前家庭总资产 = 期初总资产 + 已确认月份盈余 − 预支池已花金额 */
+function familyTotal(){
+  return Math.round(initAssetTotal()+confirmedSurplus()-advanceSpentTotal());
+}
+
+/* ============================================================
+   渲染
+============================================================ */
+function renderAll(){renderInitBanner();renderHeader();renderMonth();renderHusband();renderWife();renderFamily();renderTrend();renderSettings();}
+function renderInitBanner(){
+  const b=document.getElementById('initBanner');
+  if(!b)return;
+  if(state.init&&state.init.done){
+    b.style.display='none';
+  }else{
+    b.style.display='';
+    // 未初始化时提示：默认起始月=上月账单月，需上月收入支撑
+    document.getElementById('initMonthTag').textContent=prevMonth(curMonthStr())+' 月账单（由 '+prevMonth(prevMonth(curMonthStr()))+' 收入支撑）';
+  }
+}
+function renderHeader(){
+  const c=cumSave();
+  document.getElementById('hdTotal').textContent=fmt(familyTotal());
+  document.getElementById('hdH').textContent=fmt(c.h);
+  document.getElementById('hdW').textContent=fmt(c.w);
+}
+function renderMonth(){
+  const sel=document.getElementById('mMonth');
+  const months=Object.keys(state.months).sort();
+  const all=[...new Set([...months,curMonthStr()])].sort();
+  const opts=all.map(m=>`<option value="${m}">${m} 月</option>`).join('');
+  sel.innerHTML=opts;
+  if(!curM||!all.includes(curM))curM=(state.init&&state.init.done&&state.init.month)||curMonthStr();
+  if(!all.includes(curM)){const op=document.createElement('option');op.value=curM;op.textContent=curM+' 月';sel.appendChild(op);}
+  sel.value=curM;
+  fillMonthForm(curM);
+}
+function switchMonth(){curM=document.getElementById('mMonth').value;renderAll();}
+function switchMonthOffset(dir){
+  const d=new Date(curM+'-01');d.setMonth(d.getMonth()-dir);
+  curM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const sel=document.getElementById('mMonth');
+  if(![...sel.options].some(o=>o.value===curM)){const op=document.createElement('option');op.value=curM;op.textContent=curM+' 月';sel.appendChild(op);}
+  sel.value=curM;renderAll();
+}
+function fillMonthForm(m){
+  const d=getM(m);
+  // 锁定：已确认 且 不在编辑模式 → 输入全部禁用
+  const locked = d.done && curEditM!==m;
+  const setDisabled=(sel,on)=>{document.querySelectorAll(sel).forEach(el=>{el.disabled=on;});};
+  document.getElementById('incH').value=d.income.h||'';
+  document.getElementById('incW').value=d.income.w||'';
+  document.getElementById('incC').value=d.income.c||'';
+  // 本月支出
+  document.getElementById('expH').value=d.expTotal.h||'';
+  document.getElementById('expW').value=d.expTotal.w||'';
+  document.getElementById('expC').value=d.expTotal.c||'';
+  // 消费统计行
+  const tbody=document.getElementById('expRows');
+  const types=[...new Set([...state.expTypes,...Object.keys(d.exp)])];
+  tbody.innerHTML=types.map(t=>{
+    const e=d.exp[t]||{h:0,w:0};
+    return `<tr>
+      <td>${esc(t)}</td>
+      <td class="num"><input type="number" class="inp-sm exp-inp" data-t="${esc(t)}" data-who="h" value="${e.h||''}" oninput="onExpInput()" ${locked?'disabled':''}></td>
+      <td class="num"><input type="number" class="inp-sm exp-inp" data-t="${esc(t)}" data-who="w" value="${e.w||''}" oninput="onExpInput()" ${locked?'disabled':''}></td>
+      <td class="num exp-line">${fmt((Number(e.h)||0)+(Number(e.w)||0))}</td>
+    </tr>`;
+  }).join('');
+  // 存款
+  const sg=saveSuggest(mIncome(m));
+  const sa=document.getElementById('saveAmt');
+  sa.value=d.save!=null?d.save:'';
+  sa.disabled=locked;
+  document.getElementById('saveSuggest').textContent=`自动建议：收入 ${fmt(mIncome(m))} → 存 ${fmt(sg)}（页面底部「确认本月数据」后生效）`;
+  // 锁定其余输入
+  setDisabled('#incH,#incW,#incC,#expH,#expW,#expC',locked);
+  // 盈余
+  renderSurplus();
+  // 资金池分配
+  renderPoolAlloc();
+  updateTotals();
+  renderMonthConfirm();
+}
+/* 草稿存款金额（输入框值或自动建议值）——确认前预览用 */
+function draftSave(){
+  const v=document.getElementById('saveAmt').value;
+  return (v===''||v==null)?saveSuggest(mIncome()):(Number(v)||0);
+}
+/* 总确认：写入存款与资金池分配，标记已确认，同步各模块 */
+function confirmMonth(){
+  const d=getM();
+  const saveAmt=draftSave();
+  // 校验：预算池总和 ≤ 盈余
+  let budgetSum=0;
+  document.querySelectorAll('[data-pool]').forEach(inp=>{
+    const p=state.pools.find(x=>x.id===inp.dataset.pool);
+    if(!(p&&p.type==='advance'))budgetSum+=(Number(inp.value)||0);
+  });
+  const s=Math.round(lastIncome(curM)-mExpTotal()-saveAmt);
+  if(budgetSum>s){
+    toast(`预算池分配 ${fmt(budgetSum)} 超过盈余 ${fmt(s)}，请调整后再确认`);
+    return;
+  }
+  const alloc={};
+  document.querySelectorAll('[data-pool]').forEach(inp=>{alloc[inp.dataset.pool]=Number(inp.value)||0;});
+  d.save=saveAmt;
+  d.poolAlloc=alloc;
+  d.done=true;
+  curEditM=null;
+  save();renderAll();
+  toast(`✅ ${curM} 已确认，数据已同步到各模块`);
+}
+/* 进入编辑模式：解锁当月输入，改完需再次确认才更新模块 */
+function editMonth(){
+  const d=getM();
+  if(!d.done){toast('该月尚未确认');return;}
+  curEditM=curM;
+  renderMonth();
+  toast('✏️ 已进入编辑，改完点「确认本月数据」重新生效');
+}
+/* 底部总确认区渲染 */
+function renderMonthConfirm(){
+  const box=document.getElementById('monthConfirmBox');
+  if(!box)return;
+  const d=getM();
+  if(d.done&&curEditM!==curM){
+    box.innerHTML=`<div style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:8px;">✅ 本月数据已确认，已同步到各模块</div>
+      <div class="hint" style="margin-bottom:10px;">数据已锁定。如需修改当月数据，点下方「编辑」解锁，改完后再次确认。</div>
+      <button class="btn orange" onclick="editMonth()">✏️ 编辑当月数据</button>`;
+  }else if(d.done&&curEditM===curM){
+    box.innerHTML=`<div style="font-size:16px;font-weight:700;color:var(--orange);margin-bottom:8px;">✏️ 编辑模式（原确认数据保留，修改后需重新确认才更新模块）</div>
+      <button class="btn green" style="font-size:15px;padding:10px 26px;" onclick="confirmMonth()">✅ 重新确认本月数据</button>
+      <button class="btn gray" style="margin-left:8px;" onclick="editMonthCancel()">取消编辑</button>`;
+  }else{
+    const hasAny = (Number(document.getElementById('incH').value)||0)+(Number(document.getElementById('incW').value)||0)+(Number(document.getElementById('expH').value)||0)>0;
+    box.innerHTML=`<div style="font-size:16px;font-weight:700;color:var(--txt);margin-bottom:8px;">本月数据填写完成后，点下方按钮一次性确认生效</div>
+      <div class="hint" style="margin-bottom:10px;">确认后：存款归属、盈余、资金池分配将同步到 👨老公 / 👩老婆 / 🏠家庭 模块。${hasAny?'':'当前月份暂无数据，可先确认空表或填好再确认。'}</div>
+      <button class="btn green" style="font-size:15px;padding:10px 26px;" onclick="confirmMonth()">✅ 确认本月数据</button>`;
+  }
+}
+function editMonthCancel(){
+  curEditM=null;
+  renderMonth();
+}
+function onIncomeInput(){
+  const d=getM();
+  d.income.h=Number(document.getElementById('incH').value)||0;
+  d.income.w=Number(document.getElementById('incW').value)||0;
+  d.income.c=Number(document.getElementById('incC').value)||0;
+  const sg=saveSuggest(mIncome());
+  document.getElementById('saveSuggest').textContent=`自动建议：收入 ${fmt(mIncome())} → 存 ${fmt(sg)}（页面底部「确认本月数据」后生效）`;
+  save();updateTotals();renderSurplus();renderMonthConfirm();
+}
+function onExpTotalInput(){
+  const d=getM();
+  d.expTotal.h=Number(document.getElementById('expH').value)||0;
+  d.expTotal.w=Number(document.getElementById('expW').value)||0;
+  d.expTotal.c=Number(document.getElementById('expC').value)||0;
+  save();updateTotals();renderSurplus();renderMonthConfirm();
+}
+function onExpInput(){
+  const d=getM();
+  const rows=document.querySelectorAll('.exp-inp');
+  rows.forEach(inp=>{
+    const t=inp.dataset.t,who=inp.dataset.who,v=Number(inp.value)||0;
+    if(!d.exp[t])d.exp[t]={h:0,w:0};
+    d.exp[t][who]=v;
+  });
+  updateTotals();save();renderSurplus();renderMonthConfirm();
+}
+function updateTotals(){
+  // 本月支出总额
+  document.getElementById('expTotalLbl').innerHTML=`支出合计 <b>${fmt(mExpTotal())}</b>（👨${fmt(mExpH())} · 👩${fmt(mExpW())} · 💵${fmt(mExpC())}）`;
+  // 消费统计表合计（仅分析）
+  const st=expStat();
+  document.getElementById('incTotal').innerHTML=`总收入 <b>${fmt(mIncome())}</b>`;
+  document.getElementById('expHTotal').textContent=fmt(st.h);
+  document.getElementById('expWTotal').textContent=fmt(st.w);
+  document.getElementById('expGrand').textContent=fmt(st.h+st.w);
+  document.querySelectorAll('.exp-line').forEach((el,i)=>{
+    const inp=el.closest('tr').querySelectorAll('.exp-inp');
+    const a=Number(inp[0].value)||0,b=Number(inp[1].value)||0;
+    el.textContent=fmt(a+b);
+  });
+  // 存款归属（草稿预览：用当前输入值实时算）
+  const d0=getM();
+  const locked0 = d0.done && curEditM!==curM;
+  const dv=draftSave();
+  if(dv>0){
+    const sp=saveSplitForAmt(dv);
+    document.getElementById('saveSplitBox').innerHTML=
+      `存款 <b>${fmt(dv)}</b> 按反比开销归属 → 👨 老公名下 <b>${fmt(sp.h)}</b> ｜ 👩 老婆名下 <b>${fmt(sp.w)}</b>${locked0?'（已确认）':'（预览，确认后生效）'}`;
+  }else{
+    document.getElementById('saveSplitBox').innerHTML=`本月存款为 0（未存钱）${locked0?'（已确认）':'（预览）'}`;
+  }
+}
+/* 按指定金额算归属（草稿预览用） */
+function saveSplitForAmt(amt){
+  const h=mExpH(),w=mExpW();
+  if(amt<=0)return {h:0,w:0};
+  if(h+w===0)return {h:Math.round(amt/2),w:Math.round(amt/2)};
+  return {h:Math.round(amt*w/(h+w)),w:Math.round(amt*h/(h+w))};
+}
+/* ---------- 盈余 ---------- */
+function renderSurplus(){
+  const d=getM();
+  const locked = d.done && curEditM!==curM;
+  const dv=draftSave(); // 草稿存款
+  const s=Math.round(lastIncome(curM)-mExpTotal()-dv);
+  const last=lastIncome(curM),prev=prevMonth(curM);
+  const hasPrev=state.months[prev]&&mIncome(prev)>0;
+  const isInitStart=state.init&&state.init.done&&curM===state.init.month&&state.init.prevIncome!=null;
+  const sp=saveSplitForAmt(dv);
+  const srcTxt = hasPrev ? '上月收入' : (isInitStart ? '起始月支撑收入（初始化填写）' : '（首月无上月收入，用本月收入代替）');
+  document.getElementById('surplusBox').innerHTML=
+    `本月盈余 <span class="big ${s>=0?'pos':'neg'}">${fmt(s)}</span> <span class="tag" style="background:${locked?'#e9f7ef':'#fdf3e3'};color:${locked?'var(--green)':'#d18a1f'};">${locked?'已确认':'预览'}</span><br>
+    <span class="hint">${srcTxt} ${fmt(last)} − 本月支出 ${fmt(mExpTotal())} − 本月存款 ${fmt(dv)} = 盈余 ${fmt(s)}<br>👨 老公方投入 ${fmt(sp.h)} · 👩 老婆方投入 ${fmt(sp.w)}${locked?'':'（页面底部确认后生效）'}</span>`;
+}
+/* ---------- 资金池分配 ---------- */
+function allocConfirmed(d){return d&&d.poolAlloc&&Object.values(d.poolAlloc).some(v=>Number(v)>0);}
+function renderPoolAlloc(){
+  const box=document.getElementById('poolAllocRows');
+  const d=getM();
+  const locked = d.done && curEditM!==curM;
+  if(!state.pools.length){box.innerHTML=`<div class="empty">还没有资金池，点下面「新建资金池」创建</div>`;return;}
+  box.innerHTML=state.pools.map(p=>{
+    const v=d.poolAlloc[p.id]||'';
+    const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
+    const typeMark=p.type==='advance'?`<span class="badge orange">🪙 预支</span>`:`<span class="badge green">📦 预算</span>`;
+    return `<div class="bank-row">
+      <span style="width:170px;min-width:130px;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeMark}</span>
+      <input type="number" class="inp-sm" data-pool="${p.id}" value="${v}" min="0" oninput="onPoolAllocInput()" ${locked?'disabled':''}>
+      <span class="hint">已累计 ${fmt(poolBal(p.id))}${p.target?` / 目标 ${fmt(p.target)}`:''}</span>
+    </div>`;
+  }).join('');
+  updatePoolSum();
+}
+function onPoolAllocInput(){
+  // 输入时仅实时预览合计，点页面底部「确认本月数据」才写入
+  updatePoolSum();
+}
+function updatePoolSum(){
+  const d=getM();
+  const locked = d.done && curEditM!==curM;
+  const dv=draftSave();
+  const s=Math.round(lastIncome(curM)-mExpTotal()-dv);
+  let sum=0,budgetSum=0,advSum=0;
+  document.querySelectorAll('[data-pool]').forEach(inp=>{
+    const v=Number(inp.value)||0;
+    const p=state.pools.find(x=>x.id===inp.dataset.pool);
+    sum+=v;
+    if(p&&p.type==='advance')advSum+=v;else budgetSum+=v;
+  });
+  const diff=s-budgetSum;
+  const box=document.getElementById('poolAllocSum');
+  box.innerHTML=`预算 <b>${fmt(budgetSum)}</b>${advSum>0?` ＋ 预支(已花) <b style="color:var(--orange);">${fmt(advSum)}</b>`:''} ｜ 盈余 ${fmt(s)} ｜ 未分配（活钱）<b class="${diff>=0?'pos':'neg'}">${fmt(Math.max(diff,0))}</b>${diff<0?` <span style="color:var(--red);">⚠️ 预算超出盈余${fmt(-diff)}</span>`:''}${locked?'（已确认）':'（预览，确认后生效）'}`;
+}
+/* ============================================================
+   老公 / 老婆 / 家庭 / 趋势 / 设置
+============================================================ */
+/* 找到"自由资金"池（按归属与名称匹配） */
+function freePool(owner){ return state.pools.find(p=>p.owner===owner && String(p.name).includes('自由资金')); }
+function freePoolBal(owner){ const p=freePool(owner); return p?poolBal(p.id):0; }
+function renderHusband(){
+  const c=cumSave();
+  document.getElementById('hDeposit').textContent=fmt(c.h);
+  document.getElementById('hIncome').innerHTML=fmt(state.months[curM]?state.months[curM].income.h||0:0)+` <span class="hint">本月</span>`;
+  document.getElementById('hExp').innerHTML=fmt(mExpH())+` <span class="hint">本月</span>`;
+  document.getElementById('hSurplus').innerHTML=fmt(freePoolBal('老公'))+` <span class="hint">自由资金余额</span>`;
+  // 老公池：仅显示属于老公的（自由资金已在卡片显示，列表不重复）
+  const pools=state.pools.filter(p=>p.owner==='老公'&&!String(p.name).includes('自由资金'));
+  document.getElementById('hPools').innerHTML=pools.length?pools.map(p=>poolRow(p,poolBal(p.id))).join(''):`<div class="empty">暂无其他老公专属资金池</div>`;
+  // 明细
+  detailTable('hDetail','h');
+}
+function renderWife(){
+  const c=cumSave();
+  document.getElementById('wDeposit').textContent=fmt(c.w);
+  document.getElementById('wIncome').innerHTML=fmt(state.months[curM]?state.months[curM].income.w||0:0)+` <span class="hint">本月</span>`;
+  document.getElementById('wExp').innerHTML=fmt(mExpW())+` <span class="hint">本月</span>`;
+  document.getElementById('wSurplus').innerHTML=fmt(freePoolBal('老婆'))+` <span class="hint">自由资金余额</span>`;
+  const pools=state.pools.filter(p=>p.owner==='老婆'&&!String(p.name).includes('自由资金'));
+  document.getElementById('wPools').innerHTML=pools.length?pools.map(p=>poolRow(p,poolBal(p.id))).join(''):`<div class="empty">暂无其他老婆专属资金池</div>`;
+  detailTable('wDetail','w');
+}
+function poolRow(p,bal){
+  const pct=p.target>0?Math.min(100,Math.round(bal/p.target*100)):0;
+  const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
+  const typeBadge=p.type==='advance'?`<span class="badge orange">🪙 已预支</span>`:`<span class="badge green">📦 预算</span>`;
+  return `<div style="margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge}
+      <span>${fmt(bal)}${p.target?` / ${fmt(p.target)}（${pct}%）`:''}</span></div>
+    ${p.target>0?`<div class="progress"><i style="width:${pct}%"></i></div>`:''}
+    ${p.type==='advance'?`<div class="hint" style="margin-top:2px;">已从家庭总资产中扣除</div>`:''}
+  </div>`;
+}
+function detailTable(boxId,who){
+  const box=document.getElementById(boxId);
+  const months=Object.keys(state.months).sort().reverse();
+  if(!months.length){box.innerHTML=`<div class="empty">暂无数据</div>`;return;}
+  let rows='';
+  for(const m of months){
+    const d=state.months[m];
+    const items=Object.entries(d.exp).filter(([,v])=>(Number(v[who])||0)>0);
+    if(!items.length)continue;
+    rows+=`<tr><td>${m}</td><td>${items.map(([t,v])=>`${esc(t)} ${fmt(v[who])}`).join('、')}</td><td class="num" style="font-weight:600;">${fmt(items.reduce((s,[,v])=>s+(Number(v[who])||0),0))}</td></tr>`;
+  }
+  box.innerHTML=rows?`<table><tr><th>月份</th><th>项目</th><th class="num">合计</th></tr>${rows}</table>`:`<div class="empty">暂无开销记录</div>`;
+}
+function renderFamily(){
+  let tInc=0,tExp=0;
+  const ms=Object.keys(state.months);
+  for(const m of ms){tInc+=mIncome(m);tExp+=mExpTotal(m);}
+  const tSur=confirmedSurplus();
+  const c=cumSave();
+  document.getElementById('fIncome').innerHTML=fmt(tInc)+` <span class="hint">累计</span>`;
+  document.getElementById('fExp').innerHTML=fmt(tExp)+` <span class="hint">累计</span>`;
+  document.getElementById('fDeposit').innerHTML=fmt(c.h+c.w);
+  document.getElementById('fSurplus').innerHTML=fmt(tSur)+` <span class="hint">已确认</span>`;
+  // 家庭池
+  const pools=state.pools.filter(p=>p.owner==='家庭');
+  document.getElementById('fPools').innerHTML=pools.length?pools.map(p=>poolRow(p,poolBal(p.id))).join(''):`<div class="empty">暂无家庭资金池</div>`;
+  // 期初盘点
+  const isb=document.getElementById('initSummary');
+  if(state.init&&state.init.done){
+    isb.style.display='';
+    const cards=state.init.cards||[];
+    const cardsRows=cards.map(c=>`<div class="kv"><span>${esc(c.name)}</span><span class="num">${fmt(c.bal)}</span></div>`).join('');
+    document.getElementById('initSummaryBody').innerHTML=`
+      <div class="kv"><span>起始月份</span><span>${state.init.month}（由 ${prevMonth(state.init.month)} 收入支撑）</span></div>
+      <div class="kv"><span>📥 上月收入（支撑首月）</span><span class="num">${fmt(state.init.prevIncome)}</span></div>
+      ${cardsRows}
+      <div class="kv"><span>💵 现金</span><span class="num">${fmt(state.init.cash)}</span></div>
+      <div class="kv"><span>🏦 定期/理财</span><span class="num">${fmt(state.init.fixed)}</span></div>
+      <div class="kv" style="font-weight:700;"><span>起始总资产</span><span class="num">${fmt(initAssetTotal())}</span></div>
+      <div class="kv"><span>👨 存量存款</span><span class="num">${fmt(state.init.depositH)}</span></div>
+      <div class="kv"><span>👩 存量存款</span><span class="num">${fmt(state.init.depositW)}</span></div>
+      <div class="hint" style="margin-top:6px;">之后每个月的盈余会累加在起始资产之上。</div>`;
+  }else{
+    isb.style.display='none';
+  }
+  // 现在资产盘点（实时）
+  const ns=document.getElementById('nowSummaryCard');
+  if(state.init&&state.init.done){
+    ns.style.display='';
+    const poolLines=state.pools.map(p=>`${esc(p.name)} ${fmt(poolBal(p.id))}${p.type==='advance'?'(预支)':''}`).join('、')||'—';
+    document.getElementById('nowSummaryBody').innerHTML=`
+      <div class="kv" style="font-weight:700;"><span>🏠 家庭总资产</span><span class="num">${fmt(familyTotal())}</span></div>
+      <div class="kv"><span>👨 老公存款累计</span><span class="num">${fmt(c.h)}</span></div>
+      <div class="kv"><span>👩 老婆存款累计</span><span class="num">${fmt(c.w)}</span></div>
+      <div class="kv"><span>💰 老公自由资金</span><span class="num">${fmt(freePoolBal('老公'))}</span></div>
+      <div class="kv"><span>💰 老婆自由资金</span><span class="num">${fmt(freePoolBal('老婆'))}</span></div>
+      <div class="kv"><span>🎯 资金池余额</span><span class="num">${poolLines}</span></div>
+      <div class="kv"><span>🪙 预支已花（总资产扣除）</span><span class="num neg">${fmt(advanceSpentTotal())}</span></div>
+      <div class="kv"><span>💼 资产配置合计</span><span class="num">${fmt(assetTotal())}</span></div>
+      <div class="hint" style="margin-top:6px;">总资产 = 期初总资产 + 已确认月份盈余 − 预支池已花。未确认存款的月份不计入，故收支表没填完前总资产保持不变。</div>`;
+  }else{
+    ns.style.display='none';
+  }
+  // 开销构成（按消费统计，占比用统计内部合计做分母）
+  const cats={};
+  for(const m of ms){const d=state.months[m];for(const t in d.exp){const v=(Number(d.exp[t].h)||0)+(Number(d.exp[t].w)||0);if(v>0)cats[t]=(cats[t]||0)+v;}}
+  const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  const statTotal=sorted.reduce((s,[,v])=>s+v,0);
+  document.getElementById('fExpCat').innerHTML=sorted.length
+    ? `<table><tr><th>消费项目</th><th class="num">累计金额</th><th class="num">占比</th></tr>${
+        sorted.map(([t,v])=>`<tr><td>${esc(t)}</td><td class="num">${fmt(v)}</td><td class="num">${(v/statTotal*100).toFixed(1)}%</td></tr>`).join('')
+      }</table><div class="hint" style="margin-top:6px;">按「消费统计」分类明细合计，占比为分类间相对比例。</div>`
+    : `<div class="empty">暂无消费统计数据</div>`;
+  // 资产配置清单
+  renderAssets();
+}
+/* ---------- 资产配置清单 ---------- */
+function assetTotal(){return state.assets.reduce((s,a)=>s+(Number(a.amount)||0),0);}
+function renderAssets(){
+  const sel=document.getElementById('assetCat');
+  if(!sel)return;
+  sel.innerHTML=state.assetCats.map(c=>`<option>${esc(c)}</option>`).join('')||`<option>请先添加类别</option>`;
+  const box=document.getElementById('assetList');
+  if(!state.assetCats.length){box.innerHTML=`<div class="empty">先添加类别（理财产品类/股票类/定期存单等），再添加项目</div>`;return;}
+  const groups=state.assetCats.map(cat=>{
+    const items=state.assets.filter(a=>a.cat===cat);
+    const sub=items.reduce((s,a)=>s+(Number(a.amount)||0),0);
+    const rows=items.map(a=>`<tr>
+      <td>${esc(a.name)}</td>
+      <td class="num" style="font-weight:600;">${fmt(a.amount)}</td>
+      <td>
+        <button class="btn gray sm" onclick="editAsset('${a.id}')">改</button>
+        <button class="btn danger sm" onclick="delAsset('${a.id}')">删</button>
+      </td></tr>`).join('');
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;font-weight:600;"><span>${esc(cat)}</span><span style="color:var(--blue);">小计 ${fmt(sub)}</span></div>
+      ${items.length?`<table style="margin-top:4px;"><tr><th>项目</th><th class="num">金额</th><th></th></tr>${rows}</table>`:`<div class="hint">暂无项目</div>`}
+    </div>`;
+  }).join('');
+  box.innerHTML=groups+`<div class="kv" style="font-weight:700;"><span>配置合计</span><span class="num">${fmt(assetTotal())}</span></div>`;
+}
+function addAsset(){
+  const cat=document.getElementById('assetCat').value;
+  const name=document.getElementById('assetName').value.trim();
+  const amt=Number(document.getElementById('assetAmt').value)||0;
+  if(!cat||!name){toast('请填写类别和项目名称');return;}
+  state.assets.push({id:uid(),cat,name,amount:amt});
+  save();renderAssets();
+  document.getElementById('assetName').value='';document.getElementById('assetAmt').value=0;
+  toast('已添加资产项目');
+}
+function editAsset(id){
+  const a=state.assets.find(x=>x.id===id);if(!a)return;
+  const name=prompt('项目名称',a.name);if(!name||!name.trim())return;
+  const amt=prompt('金额(¥)',a.amount);
+  const cat=prompt('类别',a.cat);
+  a.name=name.trim();
+  a.amount=Number(amt)||0;
+  if(cat&&state.assetCats.includes(cat.trim()))a.cat=cat.trim();
+  save();renderAssets();toast('已更新');
+}
+function delAsset(id){
+  const a=state.assets.find(x=>x.id===id);
+  confirmModal('删除资产项目',`确定删除「${esc(a.name)}」？`,()=>{
+    state.assets=state.assets.filter(x=>x.id!==id);
+    save();renderAssets();toast('已删除');
+  });
+}
+function openAssetCats(){
+  const rows=state.assetCats.map((c,i)=>`<div class="bank-row">
+    <span style="flex:1;">${esc(c)}</span>
+    <button class="btn gray sm" onclick="renameAssetCat(${i})">改名</button>
+    <button class="btn danger sm" onclick="delAssetCat(${i})">删除</button>
+  </div>`).join('')||`<div class="hint">暂无类别</div>`;
+  const mm=document.getElementById('modalMask');
+  wizardOrigHTML=mm.innerHTML;
+  mm.innerHTML=`<div class="modal"><h4>资产配置类别管理</h4>
+    <div class="form-row">
+      <input type="text" id="newAssetCat" placeholder="新类别，如：债券 / 贵金属" style="flex:1;">
+      <button class="btn" onclick="addAssetCat()">＋ 添加</button>
+    </div>
+    ${rows}
+    <div class="actions">
+      <button class="btn gray" onclick="cancelWizard()">关闭</button>
+    </div></div>`;
+  mm.classList.add('show');
+}
+function addAssetCat(){
+  const name=document.getElementById('newAssetCat').value.trim();
+  if(!name){toast('请输入类别名');return;}
+  if(state.assetCats.includes(name)){toast('类别已存在');return;}
+  state.assetCats.push(name);save();renderAssets();openAssetCats();toast('已添加类别');
+}
+function renameAssetCat(i){
+  const name=prompt('新类别名',state.assetCats[i]);
+  if(!name||!name.trim())return;
+  const old=state.assetCats[i];
+  if(state.assetCats.includes(name.trim())&&name.trim()!==old){toast('已存在同名类别');return;}
+  state.assetCats[i]=name.trim();
+  state.assets.forEach(a=>{if(a.cat===old)a.cat=name.trim();});
+  save();renderAssets();openAssetCats();toast('已改名');
+}
+function delAssetCat(i){
+  const c=state.assetCats[i];
+  confirmModal('删除类别',`确定删除类别「${esc(c)}」？<br>该类下的 ${state.assets.filter(a=>a.cat===c).length} 个项目也会删除。`,()=>{
+    state.assetCats.splice(i,1);
+    state.assets=state.assets.filter(a=>a.cat!==c);
+    save();renderAssets();toast('已删除');
+  });
+}
+
+function renderTrend(){
+  const ms=Object.keys(state.months).sort();
+  const box=document.getElementById('trendChart');
+  if(ms.length<1){box.innerHTML=`<div class="empty">暂无数据，先填月度表</div>`;return;}
+  const data=ms.map(m=>({m,inc:mIncome(m),exp:mExpTotal(m),save:mSave(m),sur:mSurplus(m)}));
+  const W=940,H=320,padL=60,padB=40,padT=24,padR=16;
+  const maxV=Math.max(...data.map(d=>Math.max(d.inc,d.exp,d.save,d.sur,0)),1)*1.15;
+  const cw=(W-padL-padR)/data.length;
+  const X=i=>padL+cw*i+cw/2;
+  const Y=v=>padT+(H-padT-padB)*(1-v/maxV);
+  // 网格+刻度
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;">`;
+  for(let i=0;i<=4;i++){
+    const y=padT+(H-padT-padB)*i/4,val=maxV*(1-i/4);
+    svg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4" stroke-width="1"/>
+      <text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#7f8c9b">${Math.round(val/100)/10}k</text>`;
+  }
+  // 柱：收入(蓝) 消费(橙)
+  data.forEach((d,i)=>{
+    const bw=Math.max(cw*0.28,8);
+    const hInc=(H-padT-padB)*(d.inc/maxV),hExp=(H-padT-padB)*(d.exp/maxV);
+    svg+=`<rect x="${X(i)-bw-2}" y="${H-padB-hInc}" width="${bw}" height="${hInc}" fill="#4a90d9" opacity=".8" rx="2"><title>收入 ${fmt(d.inc)}</title></rect>
+      <rect x="${X(i)+2}" y="${H-padB-hExp}" width="${bw}" height="${hExp}" fill="#e8a33d" opacity=".8" rx="2"><title>消费 ${fmt(d.exp)}</title></rect>
+      <text x="${X(i)}" y="${H-padB+16}" text-anchor="middle" font-size="11" fill="#7f8c9b">${d.m.slice(2)}月</text>`;
+  });
+  // 线：存款(紫) 盈余(绿)
+  const line=(key,color)=>{
+    let pts=data.map((d,i)=>`${X(i)},${Y(d[key])}`).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5"/>
+      ${data.map((d,i)=>`<circle cx="${X(i)}" cy="${Y(d[key])}" r="3" fill="${color}"><title>${d.m} ${key==='save'?'存款':'盈余'} ${fmt(d[key])}</title></circle>`).join('')}`;
+  };
+  svg+=line('save','#8e6fc4')+line('sur','#27ae60');
+  svg+=`</svg><div class="legend" style="display:flex;gap:14px;font-size:13px;color:var(--sub);">
+    <span><span style="display:inline-block;width:12px;height:12px;background:#4a90d9;border-radius:2px;"></span> 收入</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#e8a33d;border-radius:2px;"></span> 消费</span>
+    <span><span style="display:inline-block;width:14px;height:3px;background:#8e6fc4;"></span> 存款</span>
+    <span><span style="display:inline-block;width:14px;height:3px;background:#27ae60;"></span> 盈余</span>
+  </div>`;
+  box.innerHTML=svg;
+  // 池子走势
+  const pb=document.getElementById('poolTrend');
+  const pools=state.pools.filter(p=>poolBal(p.id)>0||Object.keys(state.months).some(m=>(state.months[m].poolAlloc||{})[p.id]));
+  if(!pools.length){pb.innerHTML=`<div class="empty">暂无资金池数据</div>`;return;}
+  const maxP=Math.max(...pools.map(p=>poolBal(p.id)),1)*1.1;
+  const pW=940,pH=240,ppL=60,ppB=34,ppT=20,ppR=16;
+  let ps=`<svg viewBox="0 0 ${pW} ${pH}" width="100%" style="max-width:100%;">`;
+  for(let i=0;i<=3;i++){const y=ppT+(pH-ppT-ppB)*i/3,val=maxP*(1-i/3);
+    ps+=`<line x1="${ppL}" y1="${y}" x2="${pW-ppR}" y2="${y}" stroke="#eef1f4"/><text x="${ppL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#7f8c9b">${fmt(val)}</text>`;}
+  const colors=['#8e6fc4','#e8a33d','#4a90d9','#27ae60','#e87da0','#5c7a99','#d18a1f','#7f8c9b'];
+  pools.forEach((p,idx)=>{
+    // 累计到每月的余额
+    const acc=[];let sum=0;
+    for(const m of ms){sum+=(Number(state.months[m].poolAlloc?state.months[m].poolAlloc[p.id]:0)||0);acc.push(sum);}
+    const col=colors[idx%colors.length];
+    const pts=acc.map((v,i)=>`${ppL+(pW-ppL-ppR)*i/Math.max(acc.length-1,1)},${ppT+(pH-ppT-ppB)*(1-v/maxP)}`).join(' ');
+    ps+=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2.5"/>
+      ${acc.map((v,i)=>`<circle cx="${ppL+(pW-ppL-ppR)*i/Math.max(acc.length-1,1)}" cy="${ppT+(pH-ppT-ppB)*(1-v/maxP)}" r="2.5" fill="${col}"><title>${ms[i]} ${esc(p.name)} ${fmt(v)}</title></circle>`).join('')}`;
+    // x轴标签取中间
+    const xi=Math.floor(acc.length/2);
+    ps+=`<text x="${ppL+(pW-ppL-ppR)*xi/Math.max(acc.length-1,1)}" y="${ppT+(pH-ppT-ppB)*(1-acc[xi]/maxP)-8}" text-anchor="middle" font-size="11" fill="${col}">${esc(p.name)}</text>`;
+  });
+  ps+=`</svg>`;
+  pb.innerHTML=ps;
+}
+function renderSettings(){
+  // 消费类型
+  document.getElementById('expTypeList').innerHTML=state.expTypes.map((t,i)=>`<div class="bank-row">
+    <span style="flex:1;">${esc(t)}</span>
+    <button class="btn gray sm" onclick="moveType(${i},-1)">↑</button>
+    <button class="btn gray sm" onclick="moveType(${i},1)">↓</button>
+    <button class="btn gray sm" onclick="renameType(${i})">改名</button>
+    <button class="btn danger sm" onclick="delType(${i})">删除</button>
+  </div>`).join('')||`<div class="empty">暂无类型</div>`;
+  // 池子
+  document.getElementById('poolList').innerHTML=state.pools.map((p,i)=>{
+    const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
+    const typeBadge=p.type==='advance'?`<span class="badge orange">🪙 预支</span>`:`<span class="badge green">📦 预算</span>`;
+    return `<div class="bank-row">
+      <span style="flex:1;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge} <span class="hint">目标 ${p.target?fmt(p.target):'不限'} · 已累计 ${fmt(poolBal(p.id))}</span></span>
+      <button class="btn gray sm" onclick="editPool(${i})">编辑</button>
+      <button class="btn danger sm" onclick="delPool(${i})">删除</button>
+    </div>`;
+  }).join('')||`<div class="empty">暂无资金池</div>`;
+  // 规则
+  document.getElementById('cfgThr').value=state.cfg.threshold;
+  document.getElementById('cfgBase').value=state.cfg.base;
+  // 初始化状态
+  const is=document.getElementById('initStatus');
+  if(is){
+    is.textContent=state.init&&state.init.done
+      ? `当前起点：${state.init.month}（${prevMonth(state.init.month)}收入 ${fmt(state.init.prevIncome)} 支撑）· 起始总资产 ${fmt(initAssetTotal())} · 存量存款 👨${fmt(state.init.depositH)}/👩${fmt(state.init.depositW)}`
+      : '尚未初始化';
+  }
+}
+function goSettings(anchor){
+  switchTab('settings');
+  if(anchor==='exp')document.getElementById('newExpType').focus();
+  if(anchor==='pool')document.getElementById('newPoolName').focus();
+}
+function switchTab(p){
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.p===p));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id==='p-'+p));
+}
+
+/* ---------- 设置操作 ---------- */
+function addExpType(){
+  const name=document.getElementById('newExpType').value.trim();
+  if(!name){toast('请输入类型名称');return;}
+  if(state.expTypes.includes(name)){toast('该类型已存在');return;}
+  state.expTypes.push(name);save();renderSettings();toast('已添加类型');
+  document.getElementById('newExpType').value='';
+}
+function renameType(i){
+  const name=prompt('新名称',state.expTypes[i]);
+  if(!name||!name.trim())return;
+  const old=state.expTypes[i];
+  if(state.expTypes.includes(name.trim())&&name.trim()!==old){toast('已存在同名类型');return;}
+  state.expTypes[i]=name.trim();
+  // 历史数据迁移
+  for(const m in state.months){
+    if(state.months[m].exp[old]&&!state.months[m].exp[name.trim()]){
+      state.months[m].exp[name.trim()]=state.months[m].exp[old];
+      delete state.months[m].exp[old];
+    }
+  }
+  save();renderAll();toast('已改名并迁移历史数据');
+}
+function delType(i){
+  const t=state.expTypes[i];
+  confirmModal('删除消费类型',`确定删除「${esc(t)}」？<br>该类型的历史消费记录也会一并删除。`,()=>{
+    state.expTypes.splice(i,1);
+    for(const m in state.months)delete state.months[m].exp[t];
+    save();renderAll();toast('已删除');
+  });
+}
+function moveType(i,dir){
+  const j=i+dir;
+  if(j<0||j>=state.expTypes.length)return;
+  [state.expTypes[i],state.expTypes[j]]=[state.expTypes[j],state.expTypes[i]];
+  save();renderSettings();
+}
+function addPool(){
+  const name=document.getElementById('newPoolName').value.trim();
+  if(!name){toast('请输入池子名称');return;}
+  const target=Number(document.getElementById('newPoolTarget').value)||0;
+  state.pools.push({id:uid(),name,owner:document.getElementById('newPoolOwner').value,target,type:document.getElementById('newPoolType').value});
+  save();renderAll();toast('已创建资金池');
+  document.getElementById('newPoolName').value='';document.getElementById('newPoolTarget').value=0;
+}
+function editPool(i){
+  const p=state.pools[i];
+  const name=prompt('池子名称',p.name);if(!name||!name.trim())return;
+  const owner=prompt('归属（家庭/老公/老婆）',p.owner);
+  const target=prompt('目标金额(0=不限)',p.target||0);
+  const type=prompt('类型（budget=预算/advance=预支）',p.type||'budget');
+  p.name=name.trim();
+  if(['家庭','老公','老婆'].includes(owner))p.owner=owner;
+  p.target=Number(target)||0;
+  if(type==='advance'||type==='budget')p.type=type;
+  save();renderAll();toast('已更新');
+}
+function delPool(i){
+  const p=state.pools[i];
+  confirmModal('删除资金池',`确定删除「${esc(p.name)}」？<br>历史分配进去的金额记录也会一并删除。`,()=>{
+    state.pools.splice(i,1);
+    for(const m in state.months)delete state.months[m].poolAlloc[p.id];
+    save();renderAll();toast('已删除');
+  });
+}
+function saveCfg(){
+  state.cfg.threshold=Number(document.getElementById('cfgThr').value)||16000;
+  state.cfg.base=Number(document.getElementById('cfgBase').value)||5000;
+  save();renderAll();toast('存款规则已更新');
+}
+
+/* ---------- 数据 ---------- */
+function download(name,content,mime){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},300);
+}
+function exportData(){
+  if(!Object.keys(state.months).length){toast('暂无数据可导出');return;}
+  download(`家庭财务备份_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify({...state,_app:'familyFin',_ver:3},null,2),'application/json');
+  toast('已导出备份 ✔');
+}
+function importData(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.months)throw new Error('bad');
+      confirmModal('导入数据',`将导入 ${Object.keys(d.months).length} 个月的数据，覆盖当前数据。确定？`,()=>{
+        state={...d,expTypes:d.expTypes||[...DEFAULT_TYPES],pools:d.pools||[...DEFAULT_POOLS],assetCats:d.assetCats||[...DEFAULT_ASSET_CATS],assets:d.assets||[],cfg:d.cfg||{threshold:16000,base:5000},init:d.init||null};
+        save();renderAll();toast('✅ 导入成功');
+      });
+    }catch(err){toast('文件解析失败');}
+  };
+  r.readAsText(f);ev.target.value='';
+}
+function clearAll(){
+  confirmModal('清空全部数据','将删除所有月份数据，此操作不可恢复！请先导出备份。确定？',()=>{
+    state={months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null};
+    save();renderAll();toast('已清空');
+  });
+}
+/* 清空所有月份记录，保留初始化数据与设置（重新开始记账用） */
+function resetMonths(){
+  const n=Object.keys(state.months).length;
+  const afterInit=state.init?initAssetTotal()-advanceSpentInitOnly():0;
+  confirmModal('清空月度数据（保留初始化）',
+    `将删除全部 ${n} 个月的收支记录（含资金池分配、消费统计）。<br><br>
+     <b>保留：</b>初始化数据（期初资产/存量存款/上月收入）、资金池及类型、消费类型、资产配置清单、存款规则。<br>
+     清空后总资产回到 <b>${fmt(afterInit)}</b>。<br>
+     之后从 ${state.init&&state.init.done?state.init.month:curMonthStr()} 月起重新记录。确定？`,
+    ()=>{
+      state.months={};
+      if(state.init&&state.init.done)curM=state.init.month;
+      save();renderAll();toast('✅ 月度数据已清空，可重新开始记录');
+    });
+}
+/* 仅初始化阶段的预支池存量（用于清空预览） */
+function advanceSpentInitOnly(){
+  let t=0;
+  if(state.init&&state.init.poolInit){
+    for(const pid in state.init.poolInit){
+      const p=state.pools.find(x=>x.id===pid);
+      if(p&&p.type==='advance')t+=(Number(state.init.poolInit[pid])||0);
+    }
+  }
+  return t;
+}
+let modalOkFn=()=>{};
+function confirmModal(title,body,ok){
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=body;
+  modalOkFn=()=>{closeModal();ok();};
+  document.getElementById('modalMask').classList.add('show');
+}
+function closeModal(){document.getElementById('modalMask').classList.remove('show');}
+
+/* ============================================================
+   初始化向导（3步）
+============================================================ */
+let wizard={},wizardOrigHTML='';
+function openWizard(){
+  const mm=document.getElementById('modalMask');
+  wizardOrigHTML=mm.innerHTML;
+  // 默认起始月 = 上一个月（当前统计的是上月账单，如9月统计8月账单）
+  wizard={step:1,wizMonth:prevMonth(curMonthStr()),prevInc:'',cards:[{name:'老公工资卡',bal:''},{name:'老婆工资卡',bal:''}],cash:'',fixed:'',depositH:'',depositW:'',poolInit:{}};
+  state.pools.forEach(p=>wizard.poolInit[p.id]='');
+  renderWizard();
+}
+function cancelWizard(){
+  if(wizardOrigHTML)document.getElementById('modalMask').innerHTML=wizardOrigHTML;
+  closeModal();
+}
+function wizardStep(n){wizard.step=n;renderWizard();}
+function renderWizard(){
+  const mm=document.getElementById('modalMask');
+  if(wizard.step===1){
+    const rows=wizard.cards.map((c,i)=>`<div class="bank-row" style="display:flex;gap:8px;align-items:center;">
+      <input type="text" value="${esc(c.name)}" style="width:130px;" oninput="wizard.cards[${i}].name=this.value">
+      <span class="hint">余额</span><input type="number" class="inp-sm" value="${c.bal}" min="0" oninput="wizard.cards[${i}].bal=this.value">
+      <button class="btn danger sm" onclick="wizard.cards.splice(${i},1);renderWizard()">✕</button></div>`).join('');
+    mm.innerHTML=`<div class="modal"><h4>第 1/3 步 · 盘点家庭现有资产</h4>
+      <div class="bank-row" style="align-items:center;gap:8px;">
+        <span style="width:130px;">📅 起始记账月</span>
+        <select style="width:130px;" onchange="wizard.wizMonth=this.value;renderWizard()">
+          <option value="${prevMonth(curMonthStr())}" ${wizard.wizMonth===prevMonth(curMonthStr())?'selected':''}>${prevMonth(curMonthStr())}（上月账单）</option>
+          <option value="${curMonthStr()}" ${wizard.wizMonth===curMonthStr()?'selected':''}>${curMonthStr()}（本月）</option>
+        </select>
+        <span class="hint">你们现在统计的是哪个月账单就选哪个月</span>
+      </div>
+      <div class="bank-row" style="align-items:center;gap:8px;">
+        <span style="width:130px;">📥 上月收入</span>
+        <input type="number" class="inp-sm" value="${wizard.prevInc}" min="0" oninput="wizard.prevInc=this.value">
+        <span class="hint">起始月的盈余由它支撑（如 8 月账单 ← 7 月收入）</span>
+      </div>
+      <hr class="sep">
+      <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">请填今天各银行卡的当前余额：</div>
+      ${rows}
+      <button class="btn gray sm" onclick="wizard.cards.push({name:'',bal:''});renderWizard()">＋ 加一张卡</button>
+      <hr class="sep">
+      <div class="bank-row"><span style="width:130px;">💵 手头现金</span><input type="number" class="inp-sm" value="${wizard.cash}" min="0" oninput="wizard.cash=this.value"></div>
+      <div class="bank-row"><span style="width:130px;">🏦 定期/理财</span><input type="number" class="inp-sm" value="${wizard.fixed}" min="0" oninput="wizard.fixed=this.value"><span class="hint">独立存放的定期存款、理财产品合计</span></div>
+      <div class="actions">
+        <button class="btn gray" onclick="cancelWizard()">取消</button>
+        <button class="btn" onclick="wizardStep(2)">下一步 →</button>
+      </div></div>`;
+  }else if(wizard.step===2){
+    const poolRows=state.pools.length?state.pools.map(p=>`<div class="bank-row"><span style="width:150px;">${esc(p.name)}</span><input type="number" class="inp-sm" value="${wizard.poolInit[p.id]||''}" min="0" oninput="wizard.poolInit['${p.id}']=this.value"><span class="hint">已攒多少</span></div>`).join(''):`<div class="hint">暂无资金池（可到设置页先创建）</div>`;
+    mm.innerHTML=`<div class="modal"><h4>第 2/3 步 · 已存的钱与资金池现状</h4>
+      <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">至今已存下的钱（家底里属于「存款」的部分），按归属分开填：</div>
+      <div class="bank-row"><span style="width:150px;">👨 老公名下已存</span><input type="number" class="inp-sm" value="${wizard.depositH}" min="0" oninput="wizard.depositH=this.value"></div>
+      <div class="bank-row"><span style="width:150px;">👩 老婆名下已存</span><input type="number" class="inp-sm" value="${wizard.depositW}" min="0" oninput="wizard.depositW=this.value"></div>
+      <hr class="sep">
+      <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">各资金池目前已攒的金额（如梦想基金已攒 8,000）：</div>
+      ${poolRows}
+      <div class="actions">
+        <button class="btn gray" onclick="cancelWizard()">取消</button>
+        <button class="btn gray" onclick="wizardStep(1)">← 上一步</button>
+        <button class="btn" onclick="wizardStep(3)">下一步 →</button>
+      </div></div>`;
+  }else{
+    const cardsTotal=wizard.cards.reduce((s,c)=>s+(Number(c.bal)||0),0);
+    const assetTotal=cardsTotal+(Number(wizard.cash)||0)+(Number(wizard.fixed)||0);
+    const depTotal=(Number(wizard.depositH)||0)+(Number(wizard.depositW)||0);
+    const poolSum=state.pools.reduce((s,p)=>s+(Number(wizard.poolInit[p.id])||0),0);
+    mm.innerHTML=`<div class="modal"><h4>第 3/3 步 · 确认起始资产</h4>
+      <div class="res">
+        起始记账月：<b>${wizard.wizMonth}</b>（由 ${prevMonth(wizard.wizMonth)} 收入支撑：<b>${fmt(wizard.prevInc)}</b>）<br>
+        银行卡合计：<b>${fmt(cardsTotal)}</b><br>
+        现金：<b>${fmt(wizard.cash)}</b><br>
+        定期/理财：<b>${fmt(wizard.fixed)}</b><br>
+        <b>起始家庭总资产：<span class="big">${fmt(assetTotal)}</span></b><br>
+        ────────────<br>
+        存量存款归属：👨 ${fmt(wizard.depositH)} ＋ 👩 ${fmt(wizard.depositW)} ＝ <b>${fmt(depTotal)}</b><br>
+        资金池已攒：<b>${fmt(poolSum)}</b><br>
+        <span class="hint">确认后，软件的所有累计（存款/资金池/总资产）都会以此为基础。${Object.keys(state.months).length?`<br>⚠️ 当前还有 ${Object.keys(state.months).length} 个月的旧数据，确认后将清空，从 ${wizard.wizMonth} 重新开始。`:''}</span>
+      </div>
+      <div class="actions">
+        <button class="btn gray" onclick="cancelWizard()">取消</button>
+        <button class="btn gray" onclick="wizardStep(2)">← 上一步</button>
+        <button class="btn green" onclick="finishWizard()">✅ 确认，开始使用</button>
+      </div></div>`;
+  }
+  mm.classList.add('show');
+}
+function finishWizard(){
+  state.init={
+    month:wizard.wizMonth,
+    prevIncome:Number(wizard.prevInc)||0,
+    cards:wizard.cards.filter(c=>c.name.trim()).map(c=>({name:c.name.trim(),bal:Number(c.bal)||0})),
+    cash:Number(wizard.cash)||0,
+    fixed:Number(wizard.fixed)||0,
+    depositH:Number(wizard.depositH)||0,
+    depositW:Number(wizard.depositW)||0,
+    poolInit:{},done:true
+  };
+  state.pools.forEach(p=>{state.init.poolInit[p.id]=Number(wizard.poolInit[p.id])||0;});
+  state.months={}; // 从起始月重新开始
+  curM=state.init.month; // 跳转到起始月
+  save();
+  if(wizardOrigHTML)document.getElementById('modalMask').innerHTML=wizardOrigHTML;
+  closeModal();renderAll();
+  toast('✅ 初始化完成，从 '+state.init.month+' 月开始记账');
+}
+
+/* ---------- 示例数据 ---------- */
+function loadSample(){
+  confirmModal('载入示例数据','将用基于你财务.xlsx的示例数据覆盖当前数据。确定？',()=>{
+    const months={
+      '2026-04':{
+        income:{h:10200,w:3200,c:0},
+        exp:{
+          '吃饭':{h:800,w:991},'房租/房贷':{h:0,w:2844},'通勤':{h:581,w:0},
+          '家庭硬件':{h:0,w:69},'衣服/化妆品':{h:0,w:1100},'旅游/兴趣爱好':{h:0,w:1400}
+        },
+        expTotal:{h:1381,w:6404,c:0},
+        save:4188,
+        poolAlloc:{},
+        done:true
+      },
+      '2026-05':{
+        income:{h:11000,w:8000,c:1900},
+        exp:{
+          '吃饭':{h:1000,w:1116},'房租/房贷':{h:0,w:2524},'通勤':{h:500,w:0},
+          '日用品':{h:0,w:1120},'家庭硬件':{h:9000,w:0},'衣服/化妆品':{h:0,w:950}
+        },
+        expTotal:{h:10500,w:5710,c:0},
+        save:5000,
+        poolAlloc:{'p1':5000,'p3':1500,'p4':1500},
+        done:true
+      },
+      '2026-06':{
+        income:{h:16200,w:5200,c:2100},
+        exp:{
+          '吃饭':{h:800,w:900},'房租/房贷':{h:0,w:2500},'通勤':{h:400,w:0},
+          '日用品':{h:0,w:1000},'衣服/化妆品':{h:0,w:1300},'其他支出':{h:2400,w:0}
+        },
+        expTotal:{h:3600,w:5700,c:500},
+        save:5000,
+        poolAlloc:{'p2':5000,'p3':2000,'p4':1000},
+        done:true
+      },
+      '2026-07':{
+        income:{h:16897,w:2500,c:700},
+        exp:{
+          '吃饭':{h:800,w:998},'房租/房贷':{h:0,w:2540},'通勤':{h:320,w:0},
+          '日用品':{h:0,w:770},'衣服/化妆品':{h:0,w:800},'旅游/兴趣爱好':{h:0,w:895}
+        },
+        expTotal:{h:1120,w:6003,c:0},
+        save:5000,
+        poolAlloc:{'p2':5000,'p3':1500,'p4':1500},
+        done:true
+      },
+      '2026-08':{
+        income:{h:11700,w:8000,c:2000},
+        exp:{
+          '吃饭':{h:800,w:1000},'旅游/兴趣爱好':{h:12000,w:0}
+        },
+        expTotal:{h:12800,w:1000,c:0},
+        save:5000,
+        poolAlloc:{},
+        done:true
+      },
+    };
+    state={months,expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],
+      assets:[
+        {id:'as1',cat:'理财产品类',name:'黄金',amount:30000},
+        {id:'as2',cat:'理财产品类',name:'指数基金',amount:20000},
+        {id:'as3',cat:'股票类',name:'A股持仓',amount:15000},
+        {id:'as4',cat:'定期存单',name:'三年期大额存单',amount:50000}
+      ],
+      cfg:{threshold:16000,base:5000},init:null};
+    save();renderAll();toast('✅ 已载入示例数据');
+  });
+}
+
+/* ---------- 初始化 ---------- */
+document.getElementById('nav').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  switchTab(b.dataset.p);
+});
+renderAll();
+</script>
+</body>
+</html>
