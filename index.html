@@ -264,10 +264,11 @@
       <div class="form-row">
         <div class="field"><label>池子名称</label><input type="text" id="newPoolName" class="w180" placeholder="如：买房基金"></div>
         <div class="field"><label>归属</label><select id="newPoolOwner"><option value="家庭">🏠 家庭</option><option value="老公">👨 老公</option><option value="老婆">👩 老婆</option></select></div>
-        <div class="field"><label>类型</label><select id="newPoolType"><option value="budget">📦 预算（钱还在，先留用）</option><option value="advance">🪙 预支（已花掉，从总资产扣）</option></select></div>
-        <div class="field"><label>目标金额(¥)</label><input type="number" id="newPoolTarget" class="w180" min="0" placeholder="0=不限"></div>
+        <div class="field"><label>类型</label><select id="newPoolType"><option value="budget">📦 预算（分配自由资金，钱还在）</option><option value="advance">🪙 预支（已花掉的总额）</option></select></div>
+        <div class="field"><label>金额(¥)</label><input type="number" id="newPoolTarget" class="w180" min="0" placeholder="预算=目标 / 预支=总额"></div>
         <button class="btn" onclick="addPool()">＋ 添加池子</button>
       </div>
+      <div class="hint" style="margin-bottom:8px;">📦 预算：每月盈余分配进去，钱还在（花掉时才减资产）。🪙 预支：填"已花掉的总额"（如旅游预支 12000），每月分配盈余=弥补，净预支 = 总额 − 已投入，从总资产扣除。</div>
       <div id="poolList"></div>
     </div>
     <div class="card">
@@ -451,26 +452,24 @@ function confirmedSurplus(){
   }
   return t;
 }
-/* 预支池已花金额 = 分配到"预支"类型池子的钱（视为已花掉），含初始化存量与各月分配 */
+/* 预支池信息：
+   quota = 预支总额（target，已花掉的额度）
+   paid  = 已投入（初始化存量 + 各月盈余分配，视为"弥补/偿还"）
+   net   = 净预支（真正需从总资产扣除的部分）= max(quota - paid, 0)
+   未设 quota 时退回旧逻辑：net = paid */
+function advanceInfo(p){
+  const quota=Number(p.target)||0;
+  let paid=(state.init&&state.init.poolInit&&Number(state.init.poolInit[p.id]))||0;
+  for(const m in state.months){paid+=(Number(state.months[m].poolAlloc?state.months[m].poolAlloc[p.id]:0)||0);}
+  const net = quota>0 ? Math.max(quota-paid,0) : paid;
+  return {quota,paid,net};
+}
 function advanceSpentTotal(){
   let t=0;
-  if(state.init&&state.init.poolInit){
-    for(const pid in state.init.poolInit){
-      const p=state.pools.find(x=>x.id===pid);
-      if(p&&p.type==='advance')t+=(Number(state.init.poolInit[pid])||0);
-    }
-  }
-  for(const m in state.months){
-    const d=state.months[m];
-    if(!d||!d.poolAlloc)continue;
-    for(const pid in d.poolAlloc){
-      const p=state.pools.find(x=>x.id===pid);
-      if(p&&p.type==='advance')t+=(Number(d.poolAlloc[pid])||0);
-    }
-  }
+  for(const p of state.pools){ if(p.type==='advance') t+=advanceInfo(p).net; }
   return t;
 }
-/* 当前家庭总资产 = 期初总资产 + 已确认月份盈余 − 预支池已花金额 */
+/* 当前家庭总资产 = 期初总资产 + 已确认月份盈余 − 预支池净预支 */
 function familyTotal(){
   return Math.round(initAssetTotal()+confirmedSurplus()-advanceSpentTotal());
 }
@@ -702,10 +701,14 @@ function renderPoolAlloc(){
     const v=d.poolAlloc[p.id]||'';
     const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
     const typeMark=p.type==='advance'?`<span class="badge orange">🪙 预支</span>`:`<span class="badge green">📦 预算</span>`;
+    const infoHint = p.type==='advance'
+      ? (()=>{const ai=advanceInfo(p);const after=v?(ai.quota?Math.max(ai.quota-(ai.paid+(Number(v)||0)),0):(ai.paid+(Number(v)||0))):ai.net;
+          return `<span class="hint">净预支 ${fmt(ai.net)}${v?' → '+fmt(after):''}${ai.quota?` / 总额 ${fmt(ai.quota)}`:''}（投入=弥补）</span>`;})()
+      : `<span class="hint">已累计 ${fmt(poolBal(p.id))}${p.target?` / 目标 ${fmt(p.target)}`:''}</span>`;
     return `<div class="bank-row">
       <span style="width:170px;min-width:130px;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeMark}</span>
       <input type="number" class="inp-sm" data-pool="${p.id}" value="${v}" min="0" oninput="onPoolAllocInput()" ${locked?'disabled':''}>
-      <span class="hint">已累计 ${fmt(poolBal(p.id))}${p.target?` / 目标 ${fmt(p.target)}`:''}</span>
+      ${infoHint}
     </div>`;
   }).join('');
   updatePoolSum();
@@ -761,12 +764,20 @@ function renderWife(){
 function poolRow(p,bal){
   const pct=p.target>0?Math.min(100,Math.round(bal/p.target*100)):0;
   const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
-  const typeBadge=p.type==='advance'?`<span class="badge orange">🪙 已预支</span>`:`<span class="badge green">📦 预算</span>`;
+  const typeBadge=p.type==='advance'?`<span class="badge orange">🪙 预支</span>`:`<span class="badge green">📦 预算</span>`;
+  if(p.type==='advance'){
+    const ai=advanceInfo(p);
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge}
+        <span><b style="color:var(--red);">净预支 ${fmt(ai.net)}</b>${ai.quota?` / 总额 ${fmt(ai.quota)}`:''}</span></div>
+      ${ai.quota?`<div class="progress"><i style="width:${Math.min(100,Math.round(ai.paid/ai.quota*100))}%;background:var(--orange);"></i></div>`:''}
+      <div class="hint" style="margin-top:2px;">已投入（弥补）${fmt(ai.paid)}${ai.quota?`，净预支 = 总额 ${fmt(ai.quota)} − 投入 ${fmt(ai.paid)} = ${fmt(ai.net)}`:''}；净预支从家庭总资产中扣除</div>
+    </div>`;
+  }
   return `<div style="margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge}
       <span>${fmt(bal)}${p.target?` / ${fmt(p.target)}（${pct}%）`:''}</span></div>
     ${p.target>0?`<div class="progress"><i style="width:${pct}%"></i></div>`:''}
-    ${p.type==='advance'?`<div class="hint" style="margin-top:2px;">已从家庭总资产中扣除</div>`:''}
   </div>`;
 }
 function detailTable(boxId,who){
@@ -826,7 +837,7 @@ function renderFamily(){
       <div class="kv"><span>💰 老公自由资金</span><span class="num">${fmt(freePoolBal('老公'))}</span></div>
       <div class="kv"><span>💰 老婆自由资金</span><span class="num">${fmt(freePoolBal('老婆'))}</span></div>
       <div class="kv"><span>🎯 资金池余额</span><span class="num">${poolLines}</span></div>
-      <div class="kv"><span>🪙 预支已花（总资产扣除）</span><span class="num neg">${fmt(advanceSpentTotal())}</span></div>
+      <div class="kv"><span>🪙 预支净欠（总资产扣除）</span><span class="num neg">${fmt(advanceSpentTotal())}</span></div>
       <div class="kv"><span>💼 资产配置合计</span><span class="num">${fmt(assetTotal())}</span></div>
       <div class="hint" style="margin-top:6px;">总资产 = 期初总资产 + 已确认月份盈余 − 预支池已花。未确认存款的月份不计入，故收支表没填完前总资产保持不变。</div>`;
   }else{
@@ -1017,8 +1028,11 @@ function renderSettings(){
   document.getElementById('poolList').innerHTML=state.pools.map((p,i)=>{
     const ownerBadge=p.owner==='老公'?'h':p.owner==='老婆'?'w':'fam';
     const typeBadge=p.type==='advance'?`<span class="badge orange">🪙 预支</span>`:`<span class="badge green">📦 预算</span>`;
+    const info=p.type==='advance'
+      ? (()=>{const ai=advanceInfo(p);return `净预支 ${fmt(ai.net)}${ai.quota?` / 总额 ${fmt(ai.quota)}`:''} · 已投入 ${fmt(ai.paid)}`;})()
+      : `目标 ${p.target?fmt(p.target):'不限'} · 已累计 ${fmt(poolBal(p.id))}`;
     return `<div class="bank-row">
-      <span style="flex:1;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge} <span class="hint">目标 ${p.target?fmt(p.target):'不限'} · 已累计 ${fmt(poolBal(p.id))}</span></span>
+      <span style="flex:1;"><b>${esc(p.name)}</b> <span class="badge ${ownerBadge}">${p.owner}</span> ${typeBadge} <span class="hint">${info}</span></span>
       <button class="btn gray sm" onclick="editPool(${i})">编辑</button>
       <button class="btn danger sm" onclick="delPool(${i})">删除</button>
     </div>`;
@@ -1170,7 +1184,7 @@ function editPool(i){
   const p=state.pools[i];
   const name=prompt('池子名称',p.name);if(!name||!name.trim())return;
   const owner=prompt('归属（家庭/老公/老婆）',p.owner);
-  const target=prompt('目标金额(0=不限)',p.target||0);
+  const target=prompt('金额(0=不限)：预算=目标 / 预支=预支总额',p.target||0);
   const type=prompt('类型（budget=预算/advance=预支）',p.type||'budget');
   p.name=name.trim();
   if(['家庭','老公','老婆'].includes(owner))p.owner=owner;
@@ -1240,14 +1254,14 @@ function resetMonths(){
       save();renderAll();toast('✅ 月度数据已清空，可重新开始记录');
     });
 }
-/* 仅初始化阶段的预支池存量（用于清空预览） */
+/* 清空月份后的净预支（用于清空预览：各预支池 net = max(总额target - 存量poolInit, 0)） */
 function advanceSpentInitOnly(){
   let t=0;
-  if(state.init&&state.init.poolInit){
-    for(const pid in state.init.poolInit){
-      const p=state.pools.find(x=>x.id===pid);
-      if(p&&p.type==='advance')t+=(Number(state.init.poolInit[pid])||0);
-    }
+  for(const p of state.pools){
+    if(p.type!=='advance')continue;
+    const quota=Number(p.target)||0;
+    const initPaid=(state.init&&state.init.poolInit&&Number(state.init.poolInit[p.id]))||0;
+    t+= quota>0 ? Math.max(quota-initPaid,0) : initPaid;
   }
   return t;
 }
