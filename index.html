@@ -173,12 +173,19 @@
       <h3>💎 本月盈余（可自由支配）</h3>
       <div class="res" id="surplusBox"></div>
       <hr class="sep">
-      <p style="font-size:13px;font-weight:600;color:var(--purple);margin-bottom:4px;">🎯 资金池分配 <span class="tag">📦预算=从盈余划拨(钱还在) · 🪙预支=已花掉(从总资产扣)</span></p>
+      <p style="font-size:13px;font-weight:600;color:var(--purple);margin-bottom:4px;">🎯 资金池分配 <span class="tag">📦预算=从盈余划拨(钱还在) · 🪙预支=已花掉(净预支从总资产扣)</span></p>
       <div id="poolAllocRows"></div>
       <div class="form-row" style="margin-top:8px;">
         <button class="btn gray sm" onclick="goSettings('pool')">＋ 新建资金池</button>
       </div>
       <div class="hint" id="poolAllocSum" style="margin-top:6px;"></div>
+      <hr class="sep">
+      <p style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:4px;">💼 盈余 → 资产配置（买入） <span class="tag">自动关联家庭资产清单</span></p>
+      <div id="assetAllocRows"></div>
+      <div class="form-row" style="margin-top:8px;">
+        <button class="btn gray sm" onclick="goSettings('asset')">＋ 添加资产项目</button>
+      </div>
+      <div class="hint" id="assetAllocSum" style="margin-top:6px;"></div>
     </div>
 
     <!-- 总确认 -->
@@ -238,7 +245,7 @@
         <button class="btn gray" onclick="openAssetCats()">管理类别</button>
       </div>
       <div id="assetList"></div>
-      <div class="hint" style="margin-top:6px;">这里记录家庭的钱配置在哪些投资上（理财/股票/定期存单等），仅作清单查看，不影响存款与盈余计算。</div>
+      <div class="hint" style="margin-top:6px;">记录家庭的钱配置在哪些投资上。持仓 = 基础金额 + 每月盈余买入（在 📅月度表 → 盈余 → 💼盈余→资产配置 分配）。</div>
     </div>
     <div class="card"><h3>📊 家庭开销构成（全年累计 · 按消费统计）</h3><div id="fExpCat"></div></div>
   </div>
@@ -369,6 +376,7 @@ function migrate(s){
       for(const k in (d.exp||{})){h+=(Number(d.exp[k].h)||0);w+=(Number(d.exp[k].w)||0);}
       d.expTotal={h,w,c:0};
     }
+    if(!d.assetAlloc)d.assetAlloc={};
     // 旧月份无 done：有 save（已确认过存款）视为已确认
     if(d.done===undefined)d.done = d.save!=null;
     // 移除旧字段
@@ -385,7 +393,7 @@ function curMonthStr(){return today().slice(0,7);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 /* ---------- 月度数据访问 ---------- */
-function getM(m){m=m||curM;if(!state.months[m])state.months[m]={income:{h:0,w:0,c:0},exp:{},expTotal:{h:0,w:0,c:0},save:null,poolAlloc:{},done:false};return state.months[m];}
+function getM(m){m=m||curM;if(!state.months[m])state.months[m]={income:{h:0,w:0,c:0},exp:{},expTotal:{h:0,w:0,c:0},save:null,poolAlloc:{},assetAlloc:{},done:false};return state.months[m];}
 function mIncome(m){const d=getM(m).income;return (Number(d.h)||0)+(Number(d.w)||0)+(Number(d.c)||0);}
 /* 本月支出（实际支出，用于计算） */
 function mExpH(m){return Number(getM(m).expTotal.h)||0;}
@@ -550,6 +558,7 @@ function fillMonthForm(m){
   renderSurplus();
   // 资金池分配
   renderPoolAlloc();
+  renderAssetAlloc();
   updateTotals();
   renderMonthConfirm();
 }
@@ -562,21 +571,25 @@ function draftSave(){
 function confirmMonth(){
   const d=getM();
   const saveAmt=draftSave();
-  // 校验：预算池总和 ≤ 盈余
-  let budgetSum=0;
+  // 校验：预算池总和 + 资产买入 ≤ 盈余（预支池=弥补，不受限）
+  let budgetSum=0,assetSum=0;
   document.querySelectorAll('[data-pool]').forEach(inp=>{
     const p=state.pools.find(x=>x.id===inp.dataset.pool);
     if(!(p&&p.type==='advance'))budgetSum+=(Number(inp.value)||0);
   });
+  document.querySelectorAll('[data-asset]').forEach(inp=>{assetSum+=(Number(inp.value)||0);});
   const s=Math.round(lastIncome(curM)-mExpTotal()-saveAmt);
-  if(budgetSum>s){
-    toast(`预算池分配 ${fmt(budgetSum)} 超过盈余 ${fmt(s)}，请调整后再确认`);
+  if(budgetSum+assetSum>s){
+    toast(`预算池 + 资产买入合计 ${fmt(budgetSum+assetSum)} 超过盈余 ${fmt(s)}，请调整后再确认`);
     return;
   }
   const alloc={};
   document.querySelectorAll('[data-pool]').forEach(inp=>{alloc[inp.dataset.pool]=Number(inp.value)||0;});
+  const assetAlloc={};
+  document.querySelectorAll('[data-asset]').forEach(inp=>{assetAlloc[inp.dataset.asset]=Number(inp.value)||0;});
   d.save=saveAmt;
   d.poolAlloc=alloc;
+  d.assetAlloc=assetAlloc;
   d.done=true;
   curEditM=null;
   save();renderAll();
@@ -722,16 +735,48 @@ function updatePoolSum(){
   const locked = d.done && curEditM!==curM;
   const dv=draftSave();
   const s=Math.round(lastIncome(curM)-mExpTotal()-dv);
-  let sum=0,budgetSum=0,advSum=0;
+  let sum=0,budgetSum=0,advSum=0,assetSum=0;
   document.querySelectorAll('[data-pool]').forEach(inp=>{
     const v=Number(inp.value)||0;
     const p=state.pools.find(x=>x.id===inp.dataset.pool);
     sum+=v;
     if(p&&p.type==='advance')advSum+=v;else budgetSum+=v;
   });
-  const diff=s-budgetSum;
+  document.querySelectorAll('[data-asset]').forEach(inp=>{assetSum+=(Number(inp.value)||0);});
+  const used=budgetSum+assetSum;
+  const diff=s-used;
   const box=document.getElementById('poolAllocSum');
-  box.innerHTML=`预算 <b>${fmt(budgetSum)}</b>${advSum>0?` ＋ 预支(已花) <b style="color:var(--orange);">${fmt(advSum)}</b>`:''} ｜ 盈余 ${fmt(s)} ｜ 未分配（活钱）<b class="${diff>=0?'pos':'neg'}">${fmt(Math.max(diff,0))}</b>${diff<0?` <span style="color:var(--red);">⚠️ 预算超出盈余${fmt(-diff)}</span>`:''}${locked?'（已确认）':'（预览，确认后生效）'}`;
+  box.innerHTML=`预算 <b>${fmt(budgetSum)}</b>${advSum>0?` ＋ 预支(弥补) <b style="color:var(--orange);">${fmt(advSum)}</b>`:''}${assetSum>0?` ＋ 💼买入 <b style="color:var(--blue);">${fmt(assetSum)}</b>`:''} ｜ 盈余 ${fmt(s)} ｜ 未分配（活钱）<b class="${diff>=0?'pos':'neg'}">${fmt(Math.max(diff,0))}</b>${diff<0?` <span style="color:var(--red);">⚠️ 预算+买入超出盈余${fmt(-diff)}</span>`:''}${locked?'（已确认）':'（预览，确认后生效）'}`;
+}
+/* ---------- 盈余→资产配置（买入） ---------- */
+function renderAssetAlloc(){
+  const box=document.getElementById('assetAllocRows');
+  const d=getM();
+  const locked = d.done && curEditM!==curM;
+  if(!state.assets.length){box.innerHTML=`<div class="empty">暂无资产项目：先在 🏠家庭 → 资产配置清单 添加（如 黄金/指数基金），或点下面「添加资产项目」</div>`;return;}
+  box.innerHTML=state.assets.map(a=>{
+    const v=d.assetAlloc[a.id]||'';
+    return `<div class="bank-row">
+      <span style="width:170px;min-width:130px;"><b>${esc(a.name)}</b> <span class="badge fam">${esc(a.cat)}</span></span>
+      <input type="number" class="inp-sm" data-asset="${a.id}" value="${v}" min="0" oninput="onAssetAllocInput()" ${locked?'disabled':''}>
+      <span class="hint">当前持仓 ${fmt(assetHolding(a))}</span>
+    </div>`;
+  }).join('');
+  updateAssetAllocSum();
+}
+function onAssetAllocInput(){
+  // 输入时仅实时预览，点页面底部「确认本月数据」才写入
+  updateAssetAllocSum();updatePoolSum();
+}
+function updateAssetAllocSum(){
+  const d=getM();
+  const locked = d.done && curEditM!==curM;
+  let assetSum=0;
+  document.querySelectorAll('[data-asset]').forEach(inp=>{assetSum+=Number(inp.value)||0;});
+  const box=document.getElementById('assetAllocSum');
+  box.innerHTML=assetSum>0
+    ? `💼 买入合计 <b>${fmt(assetSum)}</b>（用盈余买入 → 家庭资产清单对应增加，总资产不变）${locked?'（已确认）':'（预览，确认后生效）'}`
+    : '💼 用盈余买入资产（如分配 2000 给黄金）→ 🏠家庭资产配置清单对应增加';
 }
 /* ============================================================
    老公 / 老婆 / 家庭 / 趋势 / 设置
@@ -857,7 +902,15 @@ function renderFamily(){
   renderAssets();
 }
 /* ---------- 资产配置清单 ---------- */
-function assetTotal(){return state.assets.reduce((s,a)=>s+(Number(a.amount)||0),0);}
+/* 资产某月盈余买入累计 */
+function assetBought(id){
+  let s=0;
+  for(const m in state.months){s+=(Number(state.months[m].assetAlloc?state.months[m].assetAlloc[id]:0)||0);}
+  return s;
+}
+/* 资产当前持仓 = 基础金额 + 各月盈余买入累计 */
+function assetHolding(a){return (Number(a.amount)||0)+assetBought(a.id);}
+function assetTotal(){return state.assets.reduce((s,a)=>s+assetHolding(a),0);}
 function renderAssets(){
   const sel=document.getElementById('assetCat');
   if(!sel)return;
@@ -866,20 +919,23 @@ function renderAssets(){
   if(!state.assetCats.length){box.innerHTML=`<div class="empty">先添加类别（理财产品类/股票类/定期存单等），再添加项目</div>`;return;}
   const groups=state.assetCats.map(cat=>{
     const items=state.assets.filter(a=>a.cat===cat);
-    const sub=items.reduce((s,a)=>s+(Number(a.amount)||0),0);
-    const rows=items.map(a=>`<tr>
-      <td>${esc(a.name)}</td>
-      <td class="num" style="font-weight:600;">${fmt(a.amount)}</td>
+    const sub=items.reduce((s,a)=>s+assetHolding(a),0);
+    const rows=items.map(a=>{
+      const b=assetBought(a.id);
+      return `<tr>
+      <td>${esc(a.name)}${b>0?`<div class="hint" style="margin-top:2px;">含盈余买入 ${fmt(b)}</div>`:''}</td>
+      <td class="num" style="font-weight:600;">${fmt(assetHolding(a))}</td>
       <td>
         <button class="btn gray sm" onclick="editAsset('${a.id}')">改</button>
         <button class="btn danger sm" onclick="delAsset('${a.id}')">删</button>
-      </td></tr>`).join('');
+      </td></tr>`;
+    }).join('');
     return `<div style="margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;font-weight:600;"><span>${esc(cat)}</span><span style="color:var(--blue);">小计 ${fmt(sub)}</span></div>
-      ${items.length?`<table style="margin-top:4px;"><tr><th>项目</th><th class="num">金额</th><th></th></tr>${rows}</table>`:`<div class="hint">暂无项目</div>`}
+      ${items.length?`<table style="margin-top:4px;"><tr><th>项目</th><th class="num">持仓</th><th></th></tr>${rows}</table>`:`<div class="hint">暂无项目</div>`}
     </div>`;
   }).join('');
-  box.innerHTML=groups+`<div class="kv" style="font-weight:700;"><span>配置合计</span><span class="num">${fmt(assetTotal())}</span></div>`;
+  box.innerHTML=groups+`<div class="kv" style="font-weight:700;"><span>配置合计（含盈余买入）</span><span class="num">${fmt(assetTotal())}</span></div>`;
 }
 function addAsset(){
   const cat=document.getElementById('assetCat').value;
@@ -894,7 +950,7 @@ function addAsset(){
 function editAsset(id){
   const a=state.assets.find(x=>x.id===id);if(!a)return;
   const name=prompt('项目名称',a.name);if(!name||!name.trim())return;
-  const amt=prompt('金额(¥)',a.amount);
+  const amt=prompt('基础金额(¥，盈余买入在月度表分配)',a.amount);
   const cat=prompt('类别',a.cat);
   a.name=name.trim();
   a.amount=Number(amt)||0;
@@ -1126,6 +1182,12 @@ async function syncToGist(manual){
   }catch(e){toast('备份出错：'+e.message);}
 }
 function goSettings(anchor){
+  if(anchor==='asset'){
+    switchTab('family');
+    const nm=document.getElementById('assetName');
+    if(nm)setTimeout(()=>nm.focus(),100);
+    return;
+  }
   switchTab('settings');
   if(anchor==='exp')document.getElementById('newExpType').focus();
   if(anchor==='pool')document.getElementById('newPoolName').focus();
@@ -1457,6 +1519,14 @@ function loadSample(){
 document.getElementById('nav').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   switchTab(b.dataset.p);
+  // 切到对应面板时刷新渲染（确保数据最新）
+  const p=b.dataset.p;
+  if(p==='month')renderMonth();
+  else if(p==='husband')renderHusband();
+  else if(p==='wife')renderWife();
+  else if(p==='family')renderFamily();
+  else if(p==='trend')renderTrend();
+  else if(p==='settings')renderSettings();
 });
 renderAll();
 </script>
