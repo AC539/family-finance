@@ -1128,19 +1128,22 @@ function renderBackupStatus(){
 function saveToken(){
   const t=document.getElementById('ghToken').value.trim();
   if(!t){toast('请输入 Token');return;}
+  // 验证登录 + 读取 X-OAuth-Scopes 检测 gist 权限
   fetch('https://api.github.com/user',{headers:{'Authorization':'token '+t}})
-    .then(r=>r.json())
-    .then(u=>{
-      if(u&&u.login){
-        localStorage.setItem('familyFin_token',t);
-        state.backupCfg=state.backupCfg||{};state.backupCfg.enabled=true;
-        save();document.getElementById('ghToken').value='';
-        renderBackupStatus();renderAll();
-        toast('✅ 已连接 '+u.login);
-        syncToGist(true);
-      }else{
-        toast('Token 无效：'+(u.message||'请检查权限'));
+    .then(r=>Promise.all([r.json(), r.headers.get('X-OAuth-Scopes')||'']))
+    .then(([u,scopes])=>{
+      if(!(u&&u.login)){toast('Token 无效：'+(u.message||'请检查权限'));return;}
+      const hasGist=String(scopes).toLowerCase().includes('gist');
+      if(!hasGist){
+        toast('⚠️ Token 缺少 gist 权限：请到 GitHub → Settings → Developer settings → Personal access tokens 重新生成，勾选 gist 后再试');
+        return;
       }
+      localStorage.setItem('familyFin_token',t);
+      state.backupCfg=state.backupCfg||{};state.backupCfg.enabled=true;
+      save();document.getElementById('ghToken').value='';
+      renderBackupStatus();renderAll();
+      toast('✅ 已连接 '+u.login+'（gist 权限 ✓）');
+      syncToGist(true);
     })
     .catch(()=>toast('网络错误，无法连接 GitHub'));
 }
@@ -1157,6 +1160,7 @@ async function syncToGist(manual){
   if(!state.backupCfg)state.backupCfg={};
   // 备份数据不包含 token（token 在 localStorage 单独存储）
   const data=JSON.stringify({...state,backupCfg:{enabled:state.backupCfg.enabled,gistId:state.backupCfg.gistId,lastSync:state.backupCfg.lastSync}});
+  const permHint = (res) => (res===404||res===403) ? 'Token 缺少 gist 权限：请到 GitHub 设置 → Developer settings → Personal access tokens 重新生成，勾选 gist 后替换' : '';
   try{
     let gid=state.backupCfg.gistId;
     if(!gid){
@@ -1167,14 +1171,14 @@ async function syncToGist(manual){
       });
       const j=await res.json();
       if(j.id){state.backupCfg.gistId=j.id;}
-      else{toast('创建备份失败：'+(j.message||'可能 Token 无 gist 权限'));return;}
+      else{toast('创建备份失败：'+(permHint(res.status)||j.message||'网络异常'));return;}
     }else{
       const res=await fetch('https://api.github.com/gists/'+gid,{
         method:'PATCH',
         headers:{'Authorization':'token '+t,'Content-Type':'application/json'},
         body:JSON.stringify({files:{'family-finance-backup.json':{content:data}}})
       });
-      if(!res.ok){const j=await res.json();toast('备份失败：'+(j.message||''));return;}
+      if(!res.ok){const j=await res.json();toast('备份失败：'+(permHint(res.status)||j.message||'网络异常'));return;}
     }
     state.backupCfg.lastSync=new Date().toLocaleString('zh-CN');
     save();renderBackupStatus();
