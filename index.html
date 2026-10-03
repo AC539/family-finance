@@ -202,6 +202,7 @@
       <div class="card" style="margin:0;border-top:3px solid var(--orange);"><div class="hint">💸 本月开销</div><div class="res" id="hExp"></div></div>
       <div class="card" style="margin:0;border-top:3px solid var(--purple);"><div class="hint">💰 老公自由资金</div><div class="res" id="hSurplus"></div></div>
     </div>
+    <div class="card" style="border-top:3px solid var(--purple);"><h3>💰 老公自由资金支配</h3><div id="hPersonal"></div></div>
     <div class="card"><h3>👨 老公的资金池</h3><div id="hPools"></div></div>
     <div class="card"><h3>📋 老公各月开销明细</h3><div id="hDetail"></div></div>
   </div>
@@ -214,6 +215,7 @@
       <div class="card" style="margin:0;border-top:3px solid var(--orange);"><div class="hint">💸 本月开销</div><div class="res" id="wExp"></div></div>
       <div class="card" style="margin:0;border-top:3px solid var(--purple);"><div class="hint">💰 老婆自由资金</div><div class="res" id="wSurplus"></div></div>
     </div>
+    <div class="card" style="border-top:3px solid var(--purple);"><h3>💰 老婆自由资金支配</h3><div id="wPersonal"></div></div>
     <div class="card"><h3>👩 老婆的资金池</h3><div id="wPools"></div></div>
     <div class="card"><h3>📋 老婆各月开销明细</h3><div id="wDetail"></div></div>
   </div>
@@ -358,13 +360,14 @@ function load(){
     const s=JSON.parse(localStorage.getItem(LS_KEY));
     if(s&&s.months)return migrate(s);
   }catch(e){}
-  return {months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],cfg:{threshold:16000,base:5000},init:null,backupCfg:{enabled:false,gistId:null,lastSync:null}};
+  return {months:{},expTypes:[...DEFAULT_TYPES],pools:[...DEFAULT_POOLS],assetCats:[...DEFAULT_ASSET_CATS],assets:[],personal:[],cfg:{threshold:16000,base:5000},init:null,backupCfg:{enabled:false,gistId:null,lastSync:null}};
 }
 /* 旧版本数据迁移：补齐新增字段，保证老数据无缝衔接 */
 function migrate(s){
   if(!s.assetCats)s.assetCats=[...DEFAULT_ASSET_CATS];
   if(!s.assets)s.assets=[];
   if(!s.backupCfg)s.backupCfg={enabled:false,gistId:null,lastSync:null};
+  if(!s.personal)s.personal=[];
   // 旧资金池补齐 type（默认预算）
   (s.pools||[]).forEach(p=>{if(!p.type)p.type='budget';});
   for(const m in s.months){
@@ -784,15 +787,88 @@ function updateAssetAllocSum(){
 /* 找到"自由资金"池（按归属与名称匹配） */
 function freePool(owner){ return state.pools.find(p=>p.owner===owner && String(p.name).includes('自由资金')); }
 function freePoolBal(owner){ const p=freePool(owner); return p?poolBal(p.id):0; }
+/* ---------- 个人自由资金（独立于月度支出统计） ---------- */
+function ownerName(who){ return who==='h'?'老公':'老婆'; }
+function pLogs(who){ return (state.personal||[]).filter(x=>x.who===who); }
+function pSpent(who){ return pLogs(who).filter(x=>x.type==='consume').reduce((s,x)=>s+(Number(x.amount)||0),0); }
+function pInvestHolding(who){ return pLogs(who).filter(x=>x.type==='invest').reduce((s,x)=>s+(Number(x.amount)||0)-(Number(x.recovered)||0),0); }
+/* 自由资金剩余 = 池余额 − 个人消费（投资只是冻结，不减少总额） */
+function pBalance(who){ return freePoolBal(ownerName(who))-pSpent(who); }
+/* 可自由支配 = 剩余 − 投资中（冻结） */
+function pAvailable(who){ return pBalance(who)-pInvestHolding(who); }
+function addPersonal(who,type,amount,note){
+  const amt=Number(amount)||0;
+  if(amt<=0){toast('请输入金额');return;}
+  if(amt>pAvailable(who)){toast(`超出可自由支配资金（当前 ${fmt(pAvailable(who))}）`);return;}
+  state.personal=state.personal||[];
+  state.personal.push({id:uid(),who,type,amount:amt,note:note||'',month:curM,date:today(),recovered:0});
+  save();renderAll();
+  toast(type==='consume'?`💸 已记录消费 ${fmt(amt)}（不计入当月支出）`:`📈 已投入投资 ${fmt(amt)}，收回前不可支配`);
+}
+function recoverInvest(id){
+  const x=(state.personal||[]).find(r=>r.id===id);if(!x)return;
+  const hold=(Number(x.amount)||0)-(Number(x.recovered)||0);
+  const v=prompt(`收回投资金额（剩余 ${fmt(hold)}，留空=全额收回）`,hold);
+  if(v===null)return;
+  const amt=v===''?hold:(Number(v)||0);
+  if(amt<=0||amt>hold){toast('金额无效');return;}
+  x.recovered=(Number(x.recovered)||0)+amt;
+  save();renderAll();
+  toast(`↩️ 已收回 ${fmt(amt)}，回到可自由支配`);
+}
+function delPersonal(id){
+  const x=(state.personal||[]).find(r=>r.id===id);if(!x)return;
+  confirmModal('删除记录',`确定删除这条${x.type==='consume'?'消费':'投资'}记录（${fmt(x.amount)}）？`,()=>{
+    state.personal=state.personal.filter(r=>r.id!==id);
+    save();renderAll();toast('已删除');
+  });
+}
+function renderPersonal(boxId,who){
+  const box=document.getElementById(boxId);if(!box)return;
+  const bal=pBalance(who),hold=pInvestHolding(who),avail=pAvailable(who);
+  const investments=pLogs(who).filter(x=>x.type==='invest'&&(Number(x.amount)||0)>(Number(x.recovered)||0));
+  const recent=(state.personal||[]).filter(x=>x.who===who).slice().reverse().slice(0,10);
+  const whoName=who==='h'?'老公':'老婆';
+  box.innerHTML=`
+    <div class="stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px;">
+      <div style="padding:8px;background:#f8fafc;border-radius:6px;"><div class="hint">💰 剩余</div><div style="font-weight:700;font-size:16px;">${fmt(bal)}</div></div>
+      <div style="padding:8px;background:#fdf3e3;border-radius:6px;"><div class="hint">📈 投资中(冻结)</div><div style="font-weight:700;font-size:16px;color:var(--orange);">${fmt(hold)}</div></div>
+      <div style="padding:8px;background:#eef6ff;border-radius:6px;"><div class="hint">💵 可自由支配</div><div style="font-weight:700;font-size:16px;color:var(--blue);">${fmt(avail)}</div></div>
+    </div>
+    <div class="form-row" style="align-items:flex-end;">
+      <div class="field"><label>操作</label><select id="${boxId}Type"><option value="consume">💸 消费（不计入当月支出）</option><option value="invest">📈 投资（冻结）</option></select></div>
+      <div class="field"><label>金额(¥)</label><input type="number" id="${boxId}Amt" class="w120" min="0" placeholder="0"></div>
+      <div class="field" style="flex:1;"><label>备注 / 投资标的</label><input type="text" id="${boxId}Note" placeholder="如：买鞋 / 指数基金"></div>
+      <button class="btn" onclick="addPersonal('${who}',document.getElementById('${boxId}Type').value,document.getElementById('${boxId}Amt').value,document.getElementById('${boxId}Note').value)">确认</button>
+    </div>
+    ${investments.length?`<div style="margin-top:10px;"><div style="font-weight:600;font-size:13px;margin-bottom:4px;">📈 投资中（收回前不可自由支配）</div>
+      ${investments.map(x=>`<div class="bank-row">
+        <span style="flex:1;"><b>${esc(x.note||'未命名投资')}</b> <span class="hint">${esc(x.month||'')} · 已投 ${fmt(x.amount)}${(Number(x.recovered)||0)>0?` · 已收回 ${fmt(x.recovered)}`:''}</span></span>
+        <span class="badge fam">持有 ${fmt((Number(x.amount)||0)-(Number(x.recovered)||0))}</span>
+        <button class="btn gray sm" onclick="recoverInvest('${x.id}')">↩️ 收回</button>
+      </div>`).join('')}</div>`:''}
+    <div style="margin-top:10px;"><div style="font-weight:600;font-size:13px;margin-bottom:4px;">🧾 ${whoName}自由资金流水（最近10条）</div>
+      ${recent.length?`<table><tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th><th></th></tr>${
+        recent.map(x=>`<tr>
+          <td>${esc(x.date||x.month||'')}</td>
+          <td>${x.type==='consume'?'<span class="badge w">💸 消费</span>':'<span class="badge orange">📈 投资</span>'}</td>
+          <td class="num">${fmt(x.amount)}${(x.type==='invest'&&(Number(x.recovered)||0)>0)?`<div class="hint">已收回 ${fmt(x.recovered)}</div>`:''}</td>
+          <td>${esc(x.note||'—')}</td>
+          <td><button class="btn danger sm" onclick="delPersonal('${x.id}')">删</button></td>
+        </tr>`).join('')}</table>`:`<div class="hint">暂无记录</div>`}
+    </div>
+    <div class="hint" style="margin-top:8px;">说明：这里的消费独立于「本月支出」，不计入当月消费/盈余计算；投资部分在收回前属于冻结资金。</div>`;
+}
 function renderHusband(){
   const c=cumSave();
   document.getElementById('hDeposit').textContent=fmt(c.h);
   document.getElementById('hIncome').innerHTML=fmt(state.months[curM]?state.months[curM].income.h||0:0)+` <span class="hint">本月</span>`;
   document.getElementById('hExp').innerHTML=fmt(mExpH())+` <span class="hint">本月</span>`;
-  document.getElementById('hSurplus').innerHTML=fmt(freePoolBal('老公'))+` <span class="hint">自由资金余额</span>`;
+  document.getElementById('hSurplus').innerHTML=fmt(pBalance('h'))+` <span class="hint">剩余 · 投资中 ${fmt(pInvestHolding('h'))}</span>`;
   // 老公池：仅显示属于老公的（自由资金已在卡片显示，列表不重复）
   const pools=state.pools.filter(p=>p.owner==='老公'&&!String(p.name).includes('自由资金'));
   document.getElementById('hPools').innerHTML=pools.length?pools.map(p=>poolRow(p,poolBal(p.id))).join(''):`<div class="empty">暂无其他老公专属资金池</div>`;
+  renderPersonal('hPersonal','h');
   // 明细
   detailTable('hDetail','h');
 }
@@ -801,9 +877,10 @@ function renderWife(){
   document.getElementById('wDeposit').textContent=fmt(c.w);
   document.getElementById('wIncome').innerHTML=fmt(state.months[curM]?state.months[curM].income.w||0:0)+` <span class="hint">本月</span>`;
   document.getElementById('wExp').innerHTML=fmt(mExpW())+` <span class="hint">本月</span>`;
-  document.getElementById('wSurplus').innerHTML=fmt(freePoolBal('老婆'))+` <span class="hint">自由资金余额</span>`;
+  document.getElementById('wSurplus').innerHTML=fmt(pBalance('w'))+` <span class="hint">剩余 · 投资中 ${fmt(pInvestHolding('w'))}</span>`;
   const pools=state.pools.filter(p=>p.owner==='老婆'&&!String(p.name).includes('自由资金'));
   document.getElementById('wPools').innerHTML=pools.length?pools.map(p=>poolRow(p,poolBal(p.id))).join(''):`<div class="empty">暂无其他老婆专属资金池</div>`;
+  renderPersonal('wPersonal','w');
   detailTable('wDetail','w');
 }
 function poolRow(p,bal){
@@ -879,8 +956,8 @@ function renderFamily(){
       <div class="kv" style="font-weight:700;"><span>🏠 家庭总资产</span><span class="num">${fmt(familyTotal())}</span></div>
       <div class="kv"><span>👨 老公存款累计</span><span class="num">${fmt(c.h)}</span></div>
       <div class="kv"><span>👩 老婆存款累计</span><span class="num">${fmt(c.w)}</span></div>
-      <div class="kv"><span>💰 老公自由资金</span><span class="num">${fmt(freePoolBal('老公'))}</span></div>
-      <div class="kv"><span>💰 老婆自由资金</span><span class="num">${fmt(freePoolBal('老婆'))}</span></div>
+      <div class="kv"><span>💰 老公自由资金</span><span class="num">剩余 ${fmt(pBalance('h'))} ｜ 投资中 ${fmt(pInvestHolding('h'))} ｜ 可支配 ${fmt(pAvailable('h'))}</span></div>
+      <div class="kv"><span>💰 老婆自由资金</span><span class="num">剩余 ${fmt(pBalance('w'))} ｜ 投资中 ${fmt(pInvestHolding('w'))} ｜ 可支配 ${fmt(pAvailable('w'))}</span></div>
       <div class="kv"><span>🎯 资金池余额</span><span class="num">${poolLines}</span></div>
       <div class="kv"><span>🪙 预支净欠（总资产扣除）</span><span class="num neg">${fmt(advanceSpentTotal())}</span></div>
       <div class="kv"><span>💼 资产配置合计</span><span class="num">${fmt(assetTotal())}</span></div>
